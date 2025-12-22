@@ -1,0 +1,66 @@
+---
+# Creation date (YYYY-MM-DD)
+created: [DATE]
+
+# Status: draft | approved | implemented
+status: draft
+
+# Git branch for development: dev | feature/{feature-name}
+branch: [BRANCH]
+---
+
+# Tech Spec: [Feature Name]
+
+**User Spec:** [user-spec.md](user-spec.md)
+
+## Solution
+[2-3 sentences: technical approach]
+
+## Architecture
+
+### What we're building/modifying
+- [Component/Module 1] - [purpose]
+- [Component/Module 2] - [purpose]
+
+### How it works
+[Data flow, component interactions]
+
+## Key Decisions
+
+### [Decision 1: e.g., "Database choice"]
+**Decision:** [what we chose]
+**Rationale:** [why]
+
+### [Decision 2]
+**Decision:** [what we chose]
+**Rationale:** [why]
+
+## Data Models
+[DB schemas, interfaces, types - if applicable]
+
+## Dependencies
+**New packages:**
+- `package-name` - [purpose]
+
+**Using existing:**
+- [what's already in the project]
+
+## Testing
+
+**Integration tests:** [If needed - what integration scenarios to test / none]
+
+**E2E tests:** [If needed - what user scenarios to verify / none]
+
+*Note: For each test scenario above, create a separate task for writing the test in Implementation Tasks section below.*
+
+## Risks
+
+**Risk:** [what could go wrong]
+**Mitigation:** [how we reduce it]
+
+## Implementation Tasks
+- [ ] [Task 1: brief description](tasks/1.md) - planned
+- [ ] [Task 2: brief description](tasks/2.md) - planned
+- [ ] [Task 3: brief description](tasks/3.md) - planned
+
+*Keep this list brief - just task names + links. Detailed implementation goes in task files.*

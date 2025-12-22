@@ -1,0 +1,36 @@
+# Security & credentials
+ide/
+statsig/
+telemetry/
+.credentials.json
+.mcp.json
+
+# User data (privacy)
+projects/
+projects-registry.json
+projects.md
+project-ideas.md
+backlog.md
+history.jsonl
+todos/
+plans/
+file-history/
+plugins/
+stats-cache.json
+
+# Session & runtime
+session-env/
+shell-snapshots/
+
+# Debug & cache
+debug/
+downloads/
+tmp/
+
+# System
+.DS_Store
+*.lock
+
+# Local settings
+settings.json
+settings.local.json

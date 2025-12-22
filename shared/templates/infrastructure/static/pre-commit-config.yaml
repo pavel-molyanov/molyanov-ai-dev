@@ -1,0 +1,10 @@
+# Pre-commit hooks configuration for Python projects
+# Install: pip install pre-commit && pre-commit install
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.0
+    hooks:
+      - id: gitleaks
+        name: Detect secrets with gitleaks
+        description: Scan staged files for secrets (API keys, tokens, credentials)

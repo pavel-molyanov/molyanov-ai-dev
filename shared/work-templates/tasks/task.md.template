@@ -1,0 +1,60 @@
+---
+# Status: planned | done
+status: planned
+---
+
+# [Task Name]
+
+## Description
+[1-2 sentences: what and why]
+
+## What to do
+[Concrete steps - WHAT to implement, not HOW. No pseudocode or algorithms - that's for code-developer during implementation.]
+
+## Acceptance Criteria
+- [ ] [Criterion 1]
+- [ ] [Criterion 2]
+
+## Context Files
+
+Files that code-developer subagent should read:
+
+**Required (always include):**
+- `.claude/skills/project-knowledge/guides/architecture.md`
+- `.claude/skills/project-knowledge/guides/patterns.md`
+- `.claude/skills/project-knowledge/guides/project.md`
+- `~/.claude/skills/testing/guides/unit-tests.md`
+- `work/FEATURE-NAME/user-spec.md`
+- `work/FEATURE-NAME/tech-spec.md`
+
+**Additional (add if relevant):**
+
+Context files:
+- `.claude/skills/project-knowledge/guides/database.md` - for database/schema tasks
+- `.claude/skills/project-knowledge/guides/deployment.md` - for deployment/infrastructure tasks
+- `.claude/skills/project-knowledge/guides/git-workflow.md` - for git/CI/CD tasks
+- `.claude/skills/project-knowledge/guides/ux-guidelines.md` - for UI/text/design tasks
+
+Testing rules:
+- `~/.claude/skills/testing/guides/integration-tests.md` - for integration tests
+- `~/.claude/skills/testing/guides/e2e-tests.md` - for E2E tests (if exists)
+
+Other:
+- Files mentioned in tech-spec or user-spec
+- Existing project documentation relevant to this task
+
+## Technical Details
+
+**Files:**
+- `path/to/file.ts` - [what to do with this file]
+
+**Dependencies:**
+- [dependencies on other tasks]
+- [packages to use]
+
+**Edge cases:**
+- [edge case 1]
+- [edge case 2]
+
+**Implementation hints:**
+- [useful information - NOT pseudocode, just hints about libraries, patterns, or gotchas]

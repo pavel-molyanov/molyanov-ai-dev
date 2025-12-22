@@ -1,0 +1,333 @@
+# Interview Plan for Project Planning
+#
+# This file tracks progress of adaptive discovery interview for a new project.
+# Updated after EACH user response with scoring, values, and remaining gaps.
+#
+# CRITICAL: This file enables session recovery. Save after EVERY user response.
+#
+# Scoring: 0-100% (how well we understand this aspect)
+# Status: pending → partial → complete
+# Required: true = must reach 70%, false = optional
+
+# ============================================================================
+# Interview Metadata (Session Recovery)
+# ============================================================================
+interview_metadata:
+  started: ""  # Timestamp when interview started (YYYY-MM-DD HH:MM:SS)
+  last_updated: ""  # Timestamp of last update
+  session_interrupted: false  # Set to true if session ends unexpectedly
+  can_resume: true  # Can this interview be resumed later?
+  current_question_num: 0  # Track which question we're on
+
+# ============================================================================
+# Full Conversation History (for session recovery)
+# ============================================================================
+# This section preserves complete Q&A for resume functionality.
+# Update after EVERY user response - this is your backup if session breaks.
+#
+conversation_history: []
+# Format for each entry:
+# - question_num: 1
+#   timestamp: "2025-11-12 15:20:33"
+#   topic: "core_problem"  # Which item in phases this question addresses
+#   agent_question: |
+#     [Full text of question asked by agent]
+#   user_answer: |
+#     [Full text of user's answer]
+#   summary: "Brief summary for quick reference"
+
+# ============================================================================
+# Phase 1: Project Overview (High-Level)
+# ============================================================================
+phase1_project_overview:
+
+  project_name:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "Not discussed yet"
+    required: true
+
+  project_description:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "Need one-line description + 1-2 sentences of context"
+    required: true
+
+  target_audience:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "Need to know: who uses this, why they need it"
+    required: true
+
+  core_problem:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "Need to understand: what pain point are we solving, why it matters"
+    required: true
+
+  key_features_highlevel:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "Need 3-5 most important features (high-level only, one-line each)"
+    required: true
+
+  out_of_scope:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "Need to know: what we explicitly DON'T do (prevents scope creep)"
+    required: true
+
+  success_criteria:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "Need to know: how we measure if project is successful (concrete metrics/criteria)"
+    required: false
+
+# ============================================================================
+# Phase 2: Feature Details (Complete Inventory)
+# ============================================================================
+phase2_features:
+
+  feature_list:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "Need complete list of ALL features with descriptions"
+    required: true
+
+  feature_priorities:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "Need priority (Critical/Important/Nice-to-have) for EACH feature"
+    required: true
+
+  feature_user_value:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "Need to know WHY each feature is needed (user value, not just what it does)"
+    required: true
+
+  dependencies:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "Need to know: which features depend on others (build order)"
+    required: false  # Optional but useful
+
+  technical_constraints:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "Any technical limitations, integrations, or special requirements"
+    required: false  # Optional
+
+# ============================================================================
+# Phase 3: Roadmap (Development Approach)
+# ============================================================================
+phase3_roadmap:
+
+  development_approach:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "Need to know: phased development OR all at once?"
+    required: true
+
+  phasing_strategy:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "If phased: how to group features, what's MVP vs future"
+    required: false  # Only if phased development
+
+  milestones:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "If phased: what are milestones and exit criteria (NO time estimates)"
+    required: false  # Only if phased development
+
+  migration_context:
+    score: 0
+    status: "pending"
+    value: ""
+    gaps: "If migration: current system, data migration strategy, risks, rollback"
+    required: false  # Only if migration project
+
+# ============================================================================
+# Phase 4: Documentation Review (User Approval)
+# ============================================================================
+# After filling project.md, features.md, roadmap.md - track user review status
+phase4_documentation_review:
+
+  documentation_created:
+    status: "pending"  # pending | created | approved
+    files_created: []  # List of files created: [project.md, features.md, roadmap.md]
+    timestamp_created: ""  # When files were created
+    notes: "Documentation not yet created"
+
+  user_review:
+    status: "pending"  # pending | awaiting_feedback | changes_requested | approved
+    review_requests: []  # Track review iterations
+    # Format for each review request:
+    # - iteration: 1
+    #   timestamp: "2025-11-12 16:30:00"
+    #   files_shown: ["project.md", "features.md", "roadmap.md"]
+    #   user_response: "pending"  # pending | approved | changes_requested
+    #   feedback: ""  # User's feedback if changes requested
+    #   changes_made: ""  # Summary of changes made
+
+# ============================================================================
+# Decision Rules (How to conduct interview)
+# ============================================================================
+decision_rules:
+
+  # Scoring thresholds
+  required_threshold: 70    # Required items must reach >= 70%
+  optional_threshold: 50    # Optional items can be lower
+
+  # When to stop interview
+  stop_criteria:
+    - "All required items have score >= 70%"
+    - "OR user has exhausted knowledge (answered everything or marked as TBD)"
+    - "Quality check: Can we write clear, non-vague documentation from this info?"
+
+  # What to ask next (priority order)
+  priority_order:
+    - "Required items with score < 70% (ask about lowest score first)"
+    - "Optional items that user mentioned in context (suggests importance)"
+    - "Other optional items (if user seems knowledgeable)"
+
+  # How to ask
+  question_strategy:
+    - "Ask ONE question at a time (not batch)"
+    - "After each answer: update plan, check scores, decide next question"
+    - "If answer reveals new gaps: add them to plan immediately"
+    - "If project understanding changes: update ALL affected scores"
+
+# ============================================================================
+# Interview Progress Tracking
+# ============================================================================
+progress:
+  current_phase: "phase1_project_overview"
+  questions_asked: 0
+  last_question: ""
+  total_required_score: 0   # Average score of required items
+  total_optional_score: 0   # Average score of optional items
+  completion_estimate: "0%"
+
+  # Dynamic adjustments
+  project_complexity: "unknown"  # simple | medium | complex (adjust as you learn)
+  user_detail_level: "unknown"   # brief | moderate | detailed (affects question depth)
+
+# ============================================================================
+# Notes
+# ============================================================================
+notes: |
+  Free-form notes about interview progress:
+  - Important insights discovered
+  - Areas where user is uncertain
+  - Things to revisit later
+  - Pivot points where understanding changed
+
+# ============================================================================
+# USAGE INSTRUCTIONS
+# ============================================================================
+#
+# 1. CREATE: Copy this template to project at interview start
+#    Location: .claude/tmp/interview-plan-{timestamp}.yml
+#    Set interview_metadata.started timestamp
+#
+# 2. INITIAL SCORING: After user's free-form description, score ALL items
+#    - If user mentioned something: score based on detail (30-90%)
+#    - If not mentioned: leave at 0%
+#    - Update 'value' and 'gaps' fields
+#
+# 3. ITERATIVE LOOP (CRITICAL - save after EVERY step):
+#    a) Find highest-priority gap (required, lowest score)
+#    b) Ask ONE question about it
+#    c) User answers
+#    d) **IMMEDIATELY update plan**:
+#       - Add to conversation_history (full Q&A)
+#       - Update interview_metadata.last_updated
+#       - Increment interview_metadata.current_question_num
+#       - Update score (0-100% based on clarity)
+#       - Update value (what we learned)
+#       - Update gaps (what's still missing)
+#       - Update status (pending → partial → complete)
+#       - Update progress section (total_required_score, etc.)
+#    e) **SAVE updated plan** - don't batch, save NOW
+#    f) Check stop_criteria
+#    g) If not done: repeat from (a)
+#
+# 4. CONVERSATION HISTORY FORMAT:
+#    conversation_history:
+#      - question_num: 1
+#        timestamp: "2025-11-12 15:20:33"
+#        topic: "core_problem"
+#        agent_question: |
+#          Про проблему с текущим сайтом: Ты упомянул, что сайт на Тильде...
+#          [FULL question text]
+#        user_answer: |
+#          во-первых, сейчас мне приходится прибегать к помощи разработчиков...
+#          [FULL answer text - preserve everything user said]
+#        summary: "Tilda requires developers for changes, 500-page limit, no custom services"
+#
+# 5. RESUME FUNCTIONALITY:
+#    If interview-plan-*.yml exists in .claude/tmp/:
+#    a) Read interview_metadata and conversation_history
+#    b) Show user summary: "Found ongoing interview (started X, Y% complete)"
+#    c) Show brief recap of what was discussed (read conversation_history)
+#    d) Ask: "Continue from where we left off or start fresh?"
+#    e) If continue: resume from current_question_num + 1
+#    f) If fresh: archive old file, create new one
+#
+# 6. ADAPTIVE SCORING EXAMPLES:
+#    - User says "todo app for myself"
+#      → target_audience: 70% (clear but brief)
+#    - User says "developers building CLI tools who need to..."
+#      → target_audience: 95% (very clear and detailed)
+#    - User says "не знаю"
+#      → If required: help them discover (score stays low)
+#      → If optional: mark as TBD, move to next (score 50%, mark as "TBD")
+#
+# 7. PIVOT HANDLING:
+#    - If project understanding changes (e.g., "actually it's a migration project")
+#      → Update ALL affected scores down
+#      → Add new required items if needed
+#      → Continue interview with new understanding
+#      → Note the pivot in conversation_history
+#
+# 8. PHASE 4 - DOCUMENTATION REVIEW (CRITICAL):
+#    After filling project.md, features.md, roadmap.md:
+#    a) **Update plan - documentation_created**:
+#       - Set status: "created"
+#       - Set files_created: ["project.md", "features.md", "roadmap.md"]
+#       - Set timestamp_created
+#       - **SAVE plan**
+#    b) **Show files to user with clickable links**:
+#       - [project.md](.claude/skills/project-knowledge/guides/project.md)
+#       - [features.md](.claude/skills/project-knowledge/guides/features.md)
+#       - [roadmap.md](.claude/skills/project-knowledge/guides/roadmap.md)
+#       - Ask: "Посмотри, пожалуйста. Всё правильно? Есть что изменить?"
+#    c) **Update plan - user_review**:
+#       - Set status: "awaiting_feedback"
+#       - Add to review_requests (iteration 1, files shown, user_response: "pending")
+#       - **SAVE plan**
+#    d) **Wait for user response** (CRITICAL - don't skip this!):
+#       - If changes requested: make edits, update review_requests, show updated files, repeat
+#       - If approved: set user_review.status: "approved", save plan, proceed
+#    e) **Only when approved**: suggest next step (/init-context)
+#
+# 9. CLEANUP: After Phase 5 (user approval), optionally delete this file
+#    OR keep for future reference/audit trail
+#    (Documentation is filled and approved, plan served its purpose)
