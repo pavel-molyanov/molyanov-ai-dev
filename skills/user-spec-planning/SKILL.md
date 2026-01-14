@@ -328,6 +328,119 @@ Additional sections if relevant:
 
 **Write the file.**
 
+### Phase 5.5: Validate User Spec (Subagent)
+
+**After creating user-spec.md, validate it before showing to user.**
+
+Launch validation subagent:
+
+```
+Use Task tool with subagent_type="general-purpose":
+
+"Validate the user specification at work/{feature-name}/user-spec.md
+
+Read these files:
+- work/{feature-name}/user-spec.md
+- .claude/skills/project-knowledge/guides/project.md (if exists)
+- .claude/skills/project-knowledge/guides/architecture.md (if exists)
+
+Validate against these criteria:
+
+## 1. Completeness and Clarity
+- [ ] All required sections filled (Что делаем, Зачем, Как работает, Критерии)
+- [ ] No placeholders or TODOs
+- [ ] 'Что делаем' is clear without additional questions
+- [ ] 'Зачем' explains real user value
+
+## 2. Business Logic
+- [ ] No contradictions in requirements
+- [ ] User value is specific and measurable
+- [ ] Scope clearly defined (what we do / what we DON'T do)
+- [ ] User scenarios are realistic
+
+## 3. Solution Optimality
+- [ ] Is this the best way to solve the user's problem?
+- [ ] Is there a simpler solution that wasn't considered?
+- [ ] Solution matches the scale of the problem (not over-engineering)?
+- [ ] Alternatives considered?
+
+## 4. Scalability (early check)
+- [ ] Solution won't create bottleneck with growth?
+- [ ] No N+1 patterns in described scenarios?
+- [ ] Data can be migrated/extended later?
+
+## 5. Security (red flags)
+- [ ] No dangerous patterns (plaintext passwords, missing authorization)
+- [ ] Personal data → protection plan exists
+- [ ] External integrations → validation plan exists
+
+## 6. Testability
+- [ ] Acceptance criteria are specific (not 'works correctly')
+- [ ] Each criterion can be verified automatically or manually
+- [ ] Edge cases considered
+
+Return JSON:
+{
+  'valid': true|false,
+  'score': {
+    'completeness': 1-10,
+    'business_logic': 1-10,
+    'optimality': 1-10,
+    'scalability': 1-10,
+    'security': 1-10,
+    'testability': 1-10
+  },
+  'issues': [
+    {
+      'severity': 'critical|warning|suggestion',
+      'category': 'completeness|business_logic|optimality|scalability|security|testability',
+      'issue': 'Description of the problem',
+      'why_matters': 'Why this is important',
+      'fix': 'How to fix it'
+    }
+  ],
+  'summary': 'Brief verdict in Russian'
+}
+
+Be specific about issues and provide actionable fixes."
+```
+
+**Handle validation result:**
+
+```
+if valid == true:
+    # Proceed to Phase 6
+    pass
+
+elif has_critical_issues:
+    # Auto-fix critical issues
+    for issue in issues where severity == 'critical':
+        # Edit user-spec.md to fix the issue
+        # Use Edit tool
+
+    # Re-validate (max 2 retries)
+    retry_count += 1
+    if retry_count <= 2:
+        # Run validation again
+    else:
+        # Show issues to user, ask for help
+        "Не удалось автоматически исправить некоторые проблемы:"
+        # List remaining critical issues
+        "Помоги разобраться?"
+
+elif only_warnings_or_suggestions:
+    # Show to user as part of review
+    # Store warnings to display in Phase 6
+    validation_warnings = [issues where severity in ('warning', 'suggestion')]
+```
+
+**Update interview plan after validation:**
+
+Set `phase5_validation.status`: "completed"
+Set `phase5_validation.result`: validation JSON
+Set `phase5_validation.auto_fixes_applied`: list of fixes made
+**SAVE the plan file**
+
 ### Phase 6: Review and Approve
 
 **CRITICAL: This phase is mandatory. Do NOT skip user approval.**
@@ -349,9 +462,18 @@ Tell user (in Russian):
 
 "Готово! Я подготовил user spec:
 
-[work/{feature-name}/user-spec.md](work/{feature-name}/user-spec.md)
+[work/{feature-name}/user-spec.md](work/{feature-name}/user-spec.md)"
 
-Посмотри, пожалуйста. Всё правильно? Нужны ли изменения?"
+**If validation had warnings/suggestions, show them:**
+
+"Валидация прошла успешно. Есть несколько замечаний:
+
+⚠️ **{category}**: {issue}
+   → {fix}
+
+(это не критично, но стоит учесть)"
+
+"Посмотри, пожалуйста. Всё правильно? Нужны ли изменения?"
 
 **Step 3: Update Interview Plan (awaiting feedback):**
 

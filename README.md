@@ -54,7 +54,16 @@ Skills — модульные пакеты знаний, которые авто
 
 ### tech-spec-planning
 
-**Создание технической спецификации.** На основе user-spec создаёт tech-spec.md с архитектурными решениями и декомпозирует на атомарные задачи (tasks/*.md). Каждая задача — non-breaking increment, готовый к реализации.
+**Создание технической спецификации.** На основе user-spec создаёт tech-spec.md с архитектурными решениями и декомпозирует на атомарные задачи (tasks/*.md). Каждая задача — non-breaking increment, готовый к реализации. Включает 3-уровневую валидацию через subagent (tech-spec, decomposition, каждый task).
+
+### task-execution
+
+**Выполнение задач с quality gates.** Реализует задачи из tasks/*.md через 3-фазовый TDD workflow:
+- **PRE-TASK**: Валидация задачи, чтение context files (architecture, patterns, specs), review подхода
+- **IMPLEMENTATION**: Тесты первые → код → запуск тестов → проверка acceptance criteria
+- **POST-TASK**: Запуск тестов, опциональные reviews (code-reviewer, security-auditor), коммит, обновление статуса
+
+Вызывается командой `/do-task` или фразой "выполни задачу".
 
 ### command-manager
 
@@ -85,6 +94,14 @@ Slash-команды для автоматизации рутинных зада
 ### /new-tech-spec
 
 **Создание технической спецификации.** Обёртка над skill `tech-spec-planning`. Читает user-spec, создаёт tech-spec.md и tasks/*.md. Используется после согласования user-spec для перехода к реализации.
+
+### /do-task
+
+**Выполнение задачи.** Обёртка над skill `task-execution`. Реализует одну задачу из tasks/*.md с полным TDD workflow и quality gates. Используется после создания tech-spec для пошаговой реализации фичи.
+
+### /plan-task-waves
+
+**Планирование параллельного выполнения.** Анализирует зависимости между задачами и группирует их в "волны" для параллельной реализации. Показывает какие задачи можно выполнять одновременно, а какие должны идти последовательно.
 
 ### /project-context
 
@@ -130,6 +147,7 @@ Slash-команды для автоматизации рутинных зада
 │   ├── project-planning/   # Планирование проектов
 │   ├── user-spec-planning/ # User specifications
 │   ├── tech-spec-planning/ # Technical specifications
+│   ├── task-execution/     # Выполнение задач с TDD
 │   ├── command-manager/    # Создание команд
 │   └── skill-creator/      # Создание skills
 │
@@ -177,8 +195,9 @@ my-project/
 ### Разработка фичи
 1. `/new-user-spec` — создать user specification
 2. `/new-tech-spec` — создать tech spec + tasks
-3. Реализация через `code-developer` agent
-4. Review через `code-reviewer` + `security-auditor`
+3. `/plan-task-waves` — (опционально) спланировать параллельное выполнение
+4. `/do-task` — выполнять задачи по одной с TDD и quality gates
+5. Review через `code-reviewer` + `security-auditor` (автоматически в /do-task)
 
 ---
 
