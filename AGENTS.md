@@ -7,12 +7,12 @@
 ## Behavior
 
 - No "Great question!", no filler, no water.
-- Do not use special question tools for ordinary clarification. Ask questions as plain text in chat instead.
+- NEVER use plain chat question tool. Ask questions as plain text in chat instead.
 - ALL deployments via GitHub CI/CD only. Direct server access (SSH, container restarts) only for emergency debugging of broken production.
 
 ## Task Planning
 - Use update_plan for multi-step tasks (>1 step)
-- When user asks for team/swarm of agents: orchestrate Codex `worker`/`explorer` subagents with `spawn_agent`.
+- When user asks for team/swarm of agents: use spawn_agent worker/explorer orchestration, not spawn_agent
 
 ## Security
 
