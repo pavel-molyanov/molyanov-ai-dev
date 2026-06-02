@@ -285,4 +285,4 @@ MIT License — используйте свободно.
 
 ## Автор
 
-Pavel Molyanov — [@pavel-molyanov](https://github.com/pavel-molyanov)
+Pavel Molyanov — [molyanov.ru](https://molyanov.ru)
