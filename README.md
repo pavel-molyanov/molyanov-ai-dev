@@ -1,343 +1,347 @@
 # AI-First Development Framework
 
-Фреймворк для AI-First разработки с [Claude Code](https://docs.anthropic.com/en/docs/claude-code) и [Codex](https://github.com/openai/codex). Единая методология, два совместимых runtime.
+**English** | [Русский](README.ru.md)
 
-В основе — spec-driven pipeline: сначала детально планируем работу через интервью с пользователем и исследование кодовой базы, согласуем спецификации, и только потом пишем код. Каждый этап проверяется специализированными агентами-валидаторами. Код пишется через TDD.
+A framework for AI-First development with [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Codex](https://github.com/openai/codex). One methodology, two compatible runtimes.
 
-## Два runtime: Claude и Codex
+At its core is a spec-driven pipeline: first we plan the work in detail through an interview with the user and research of the codebase, agree on the specifications, and only then write code. Every stage is checked by specialized validator agents. Code is written via TDD.
 
-Методология поддерживает оба агента сразу.
+The framework is multilingual: it talks to you, runs interviews, and writes user-facing specs in the language you write in, while keeping technical documents (tech-spec, tasks, code) in English.
 
-- **Claude — источник истины.** Редактируются файлы в `~/.claude/`, `CLAUDE.md` и `.claude/**` проектов.
-- **Codex — сгенерированный runtime.** `~/.codex/`, `AGENTS.md` и `.codex/**` создаются из Claude-источников скриптом `scripts/sync-to-codex.py`. Вручную их не правят.
+## Two runtimes: Claude and Codex
 
-Команды (`/new-user-spec`, `/do-task`, `/done` и т.д.), скиллы, агенты — те же самые. Меняется только интерпретатор.
+The methodology supports both agents at once.
 
-### Установка
+- **Claude is the source of truth.** You edit files in `~/.claude/`, `CLAUDE.md`, and projects' `.claude/**`.
+- **Codex is the generated runtime.** `~/.codex/`, `AGENTS.md`, and `.codex/**` are created from the Claude sources by `scripts/sync-to-codex.py`. Do not edit them by hand.
 
-Скопируйте файлы фреймворка в свои runtime-папки:
+The commands (`/new-user-spec`, `/do-task`, `/done`, etc.), skills, and agents are the same. Only the interpreter changes.
+
+### Installation
+
+Copy the framework files into your runtime folders:
 
 ```bash
-# Claude (источник):
+# Claude (source):
 mkdir -p ~/.claude
 cp -r skills agents commands shared hooks ~/.claude/
 
-# Codex (готовый снапшот):
+# Codex (ready-made snapshot):
 mkdir -p ~/.codex
 cp -r .codex/skills .codex/commands .codex/agents ~/.codex/
 
-# Либо положить скрипт и перегенерировать Codex из своих ~/.claude/**:
+# Or drop in the script and regenerate Codex from your own ~/.claude/**:
 mkdir -p ~/.claude/scripts
 cp scripts/sync-to-codex.py scripts/sync-to-codex.sh ~/.claude/scripts/
 ~/.claude/scripts/sync-to-codex.sh --apply
 ```
 
-### После любых правок методологии
+### After any change to the methodology
 
-Если вы правите `~/.claude/**` локально — перегенерируйте Codex:
+If you edit `~/.claude/**` locally — regenerate Codex:
 
 ```bash
-~/.claude/scripts/sync-to-codex.sh --apply                   # глобальные изменения
-~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply  # проектные .claude/**
+~/.claude/scripts/sync-to-codex.sh --apply                   # global changes
+~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply  # per-project .claude/**
 ```
 
-Альтернатива без копирования скрипта: запустить из клона репозитория — `python3 scripts/sync-to-codex.py --apply`.
+Alternative without copying the script: run it from a clone of the repo — `python3 scripts/sync-to-codex.py --apply`.
 
 ## Quick Start
 
-**Новый проект:**
+**New project:**
 
-`/init-project` → `/init-project-knowledge` → начинаем фичи
+`/init-project` → `/init-project-knowledge` → start building features
 
-**Новая фича:**
+**New feature:**
 
-`/new-user-spec` → `/new-tech-spec` → `/decompose-tech-spec` → `/do-feature` (или `/do-task`) → `/done`
+`/new-user-spec` → `/new-tech-spec` → `/decompose-tech-spec` → `/do-feature` (or `/do-task`) → `/done`
 
-**Быстрая задача без спеки:**
+**Quick task without a spec:**
 
 `/write-code`
 
 ---
 
-## Как устроена методология
+## How the methodology works
 
-### Документация проекта — Project Knowledge
+### Project documentation — Project Knowledge
 
-Вся документация проекта хранится не в CLAUDE.md, а в отдельном скилле **Project Knowledge** — наборе файлов в `.claude/skills/project-knowledge/references/`:
+All project documentation lives not in CLAUDE.md but in a dedicated skill, **Project Knowledge** — a set of files in `.claude/skills/project-knowledge/references/`:
 
-| Файл | Что внутри |
+| File | What's inside |
 |---|---|
-| `project.md` | Назначение проекта, аудитория, ключевые фичи, scope |
-| `architecture.md` | Технический стек, структура проекта, зависимости, модель данных |
-| `patterns.md` | Конвенции кода, git workflow, стратегия тестирования, бизнес-правила |
-| `deployment.md` | Платформа, переменные окружения, CI/CD pipeline, мониторинг |
-| `ux-guidelines.md` | UI-язык, тон общения, доменный глоссарий (опционально) |
+| `project.md` | Project purpose, audience, key features, scope |
+| `architecture.md` | Tech stack, project structure, dependencies, data model |
+| `patterns.md` | Code conventions, git workflow, testing strategy, business rules |
+| `deployment.md` | Platform, environment variables, CI/CD pipeline, monitoring |
+| `ux-guidelines.md` | UI language, tone of voice, domain glossary (optional) |
 
-CLAUDE.md остаётся минимальным — название проекта, ссылка на Project Knowledge, дефолтная ветка. Агент подгружает только те файлы из Project Knowledge, которые нужны для текущей задачи (just-in-time context), а не весь контекст целиком.
+CLAUDE.md stays minimal — project name, a link to Project Knowledge, the default branch. The agent loads only the Project Knowledge files it needs for the current task (just-in-time context) rather than the entire context at once.
 
-Для создания Project Knowledge в новом проекте используется скилл **`project-planning`** (команда `/init-project-knowledge`) — он проводит интервью с пользователем, заполняет все файлы Project Knowledge и создаёт бэклог проекта (features + roadmap). Для обновления документации по ходу разработки — скилл **`documentation-writing`**.
-
----
-
-### Pipeline разработки фичи
-
-Полный путь от идеи до продакшена. На каждом шаге работают автоматические валидаторы, после каждого раунда валидации делается git-коммит (можно откатиться к любому промежуточному состоянию).
-
-#### Шаг 1. User Spec — что делаем (`/new-user-spec`)
-
-Агент подгружает скилл **`user-spec-planning`**, читает Project Knowledge, сканирует кодовую базу и проводит с пользователем структурированное интервью в 3 цикла:
-
-1. **Общие вопросы** — что хотим сделать, зачем, для кого
-2. **С учётом кода** — агент уже изучил проект и задаёт уточняющие вопросы по интеграции, существующим паттернам, зависимостям
-3. **Edge cases** — граничные случаи, ошибки, что если...
-
-После интервью агент `interview-completeness-checker` проверяет, не осталось ли пробелов. Затем агент составляет user-spec.md — спецификацию требований на русском языке, понятную человеку без технического бэкграунда.
-
-Два валидатора проверяют результат (до 3 итераций исправлений):
-- **`userspec-quality-validator`** — структура документа, тестируемость acceptance criteria
-- **`userspec-adequacy-validator`** — осуществимость решения, нет ли over/underengineering
-
-Пользователь читает и утверждает спеку.
-
-**Результат:** `work/{feature}/user-spec.md` (статус: approved)
-
-#### Шаг 2. Tech Spec — как делаем (`/new-tech-spec`)
-
-Агент подгружает скилл **`tech-spec-planning`**, берёт утверждённый user-spec и переводит его в техническую спецификацию: архитектура, ключевые решения, стратегия тестирования, план реализации с разбивкой на задачи.
-
-Пишется на английском — это документ для агента, не для человека. Если вы не разбираетесь в разработке, здесь уже ничего не поймёте — и это нормально, для этого был предыдущий шаг.
-
-На этом этапе агент исследует кодовую базу (через агента `code-researcher`), проверяет зависимости, использует Context7 MCP для получения актуальной документации внешних библиотек.
-
-5 валидаторов работают параллельно (до 3 итераций исправлений):
-- **`skeptic`** — ищет миражи: ссылки на несуществующие файлы, функции, API
-- **`completeness-validator`** — двусторонняя трассировка: все ли требования из user-spec покрыты, нет ли лишнего
-- **`security-auditor`** — проверка архитектурных решений по OWASP Top 10
-- **`test-reviewer`** — адекватность стратегии тестирования
-- **`tech-spec-validator`** — соответствие шаблону, качество задач, конфликты зависимостей
-
-Пользователь утверждает tech-spec.
-
-**Результат:** `work/{feature}/tech-spec.md` (статус: approved)
-
-#### Шаг 3. Декомпозиция на задачи (`/decompose-tech-spec`)
-
-Агент подгружает скилл **`task-decomposition`**, берёт утверждённый tech-spec и для каждой задачи из плана реализации создаёт отдельный файл. Задачи создаются параллельно агентом `task-creator`.
-
-Каждый task-файл содержит: acceptance criteria, TDD-якорь (какие тесты писать первыми), список файлов контекста, нужные скиллы, ревьюеров, волну выполнения и зависимости от других задач.
-
-2 валидатора проверяют результат (до 3 итераций):
-- **`task-validator`** — соответствие шаблону, качество описания
-- **`reality-checker`** — существуют ли указанные файлы, функции, зависимости в реальной кодовой базе
-
-**Результат:** `work/{feature}/tasks/*.md`
-
-#### Шаг 4. Разработка и QA
-
-Два режима на выбор:
-
-**`/do-task`** — одна задача за раз, ручной контроль. Агент читает task-файл, подгружает указанные скиллы (обычно `code-writing`), пишет тесты, потом код, проходит ревью. После каждого раунда ревью — коммит с исправлениями. Подходит для отладки, сложных задач, итеративной работы.
-
-**`/do-feature`** — параллельное выполнение всех задач командой агентов. Скилл **`feature-execution`** поднимает тимлида, который создаёт команду через TeamCreate и распределяет задачи по волнам. В каждой волне задачи выполняются параллельно: один агент = одна задача. Каждый агент самостоятельно коммитит код, проходит ревью (до 3 раундов), фиксит замечания. Тимлид координирует и коммитит статусы.
-
-Оба режима используют TDD: сначала тесты, потом код. После кода — автоматический code review и security audit.
-
-Финальная часть разработки любой фичи — QA. Задачи на QA добавляются автоматически в конец tech-spec:
-- **Pre-deploy QA** — запуск тестов, проверка acceptance criteria из user-spec и tech-spec
-- **Post-deploy QA** — верификация на живом окружении через MCP-инструменты (Playwright, curl, Telegram MCP и т.д.)
-
-Также есть **`/write-code`** — для написания кода без спецификации. Быстрая задача, баг-фикс, эксперимент. Использует скилл `code-writing` напрямую: план → тесты → код → code review + security audit. Без предварительного планирования через user-spec/tech-spec.
-
-#### Шаг 5. Финализация (`/done`)
-
-Закрывает фичу: читает user-spec, tech-spec и decisions.md (решения, принятые в ходе разработки), обновляет затронутые файлы Project Knowledge (architecture.md, patterns.md и т.д.), архивирует `work/{feature}/` в `work/completed/{feature}/`.
+To create Project Knowledge in a new project, use the **`project-planning`** skill (the `/init-project-knowledge` command) — it interviews the user, fills in all Project Knowledge files, and creates a project backlog (features + roadmap). To keep documentation up to date during development, use the **`documentation-writing`** skill.
 
 ---
 
-### Структура work-директории
+### Feature development pipeline
+
+The full path from idea to production. Automatic validators run at every step, and a git commit is made after each validation round (you can roll back to any intermediate state).
+
+#### Step 1. User Spec — what we're building (`/new-user-spec`)
+
+The agent loads the **`user-spec-planning`** skill, reads Project Knowledge, scans the codebase, and runs a structured interview with the user in 3 cycles:
+
+1. **General questions** — what we want to build, why, for whom
+2. **Code-informed** — the agent has already studied the project and asks clarifying questions about integration, existing patterns, dependencies
+3. **Edge cases** — boundary conditions, errors, what-ifs
+
+After the interview, the `interview-completeness-checker` agent checks for any remaining gaps. Then the agent writes user-spec.md — a requirements spec in the user's language, understandable by a person without a technical background.
+
+Two validators check the result (up to 3 fix iterations):
+- **`userspec-quality-validator`** — document structure, testability of acceptance criteria
+- **`userspec-adequacy-validator`** — feasibility of the solution, no over/underengineering
+
+The user reads and approves the spec.
+
+**Result:** `work/{feature}/user-spec.md` (status: approved)
+
+#### Step 2. Tech Spec — how we're building it (`/new-tech-spec`)
+
+The agent loads the **`tech-spec-planning`** skill, takes the approved user-spec, and turns it into a technical specification: architecture, key decisions, testing strategy, and an implementation plan broken down into tasks.
+
+It's written in English — this is a document for the agent, not for a human. If you're not into development, you won't follow much here — and that's fine, that's what the previous step was for.
+
+At this stage the agent researches the codebase (via the `code-researcher` agent), checks dependencies, and uses the Context7 MCP to fetch up-to-date documentation for external libraries.
+
+5 validators run in parallel (up to 3 fix iterations):
+- **`skeptic`** — hunts for mirages: references to non-existent files, functions, APIs
+- **`completeness-validator`** — bidirectional traceability: are all user-spec requirements covered, is there anything extra
+- **`security-auditor`** — review of architectural decisions against OWASP Top 10
+- **`test-reviewer`** — adequacy of the testing strategy
+- **`tech-spec-validator`** — template compliance, task quality, dependency conflicts
+
+The user approves the tech-spec.
+
+**Result:** `work/{feature}/tech-spec.md` (status: approved)
+
+#### Step 3. Decomposition into tasks (`/decompose-tech-spec`)
+
+The agent loads the **`task-decomposition`** skill, takes the approved tech-spec, and creates a separate file for each task in the implementation plan. Tasks are created in parallel by the `task-creator` agent.
+
+Each task file contains: acceptance criteria, a TDD anchor (which tests to write first), a list of context files, the required skills, reviewers, the execution wave, and dependencies on other tasks.
+
+2 validators check the result (up to 3 iterations):
+- **`task-validator`** — template compliance, description quality
+- **`reality-checker`** — whether the referenced files, functions, and dependencies exist in the real codebase
+
+**Result:** `work/{feature}/tasks/*.md`
+
+#### Step 4. Development and QA
+
+Two modes to choose from:
+
+**`/do-task`** — one task at a time, manual control. The agent reads the task file, loads the specified skills (usually `code-writing`), writes tests, then code, and goes through review. After each review round — a commit with fixes. Good for debugging, complex tasks, iterative work.
+
+**`/do-feature`** — parallel execution of all tasks by a team of agents. The **`feature-execution`** skill spins up a team lead who creates a team via TeamCreate and distributes tasks across waves. Within each wave tasks run in parallel: one agent = one task. Each agent commits its own code, goes through review (up to 3 rounds), and fixes findings. The team lead coordinates and commits statuses.
+
+Both modes use TDD: tests first, then code. After the code — automatic code review and security audit.
+
+The final part of any feature's development is QA. QA tasks are added automatically at the end of the tech-spec:
+- **Pre-deploy QA** — running tests, checking acceptance criteria from user-spec and tech-spec
+- **Post-deploy QA** — verification on the live environment via MCP tools (Playwright, curl, Telegram MCP, etc.)
+
+There's also **`/write-code`** — for writing code without a spec. A quick task, a bug fix, an experiment. It uses the `code-writing` skill directly: plan → tests → code → code review + security audit. No upfront planning through user-spec/tech-spec.
+
+#### Step 5. Finalization (`/done`)
+
+Closes out the feature: reads user-spec, tech-spec, and decisions.md (decisions made during development), updates the affected Project Knowledge files (architecture.md, patterns.md, etc.), and archives `work/{feature}/` into `work/completed/{feature}/`.
+
+---
+
+### Structure of the work directory
 
 ```
 work/{feature}/
-├── user-spec.md       # Что делаем (русский, для человека)
-├── tech-spec.md       # Как делаем (английский, для агента)
-├── decisions.md       # Решения, принятые в ходе разработки
+├── user-spec.md       # What we're building (user's language, for a human)
+├── tech-spec.md       # How we're building it (English, for the agent)
+├── decisions.md       # Decisions made during development
 ├── tasks/
-│   ├── 1.md           # Атомарные задачи
+│   ├── 1.md           # Atomic tasks
 │   ├── 2.md
 │   └── 3.md
-└── logs/              # Рабочие логи (интервью, исследования, ревью)
+└── logs/              # Working logs (interviews, research, reviews)
 ```
 
-Завершённые фичи архивируются в `work/completed/{feature}/`.
+Completed features are archived in `work/completed/{feature}/`.
 
 ---
 
-## Инициализация проекта
+## Project initialization
 
-Для нового проекта:
+For a new project:
 
-1. **`/init-project`** — создаёт структуру проекта из шаблона: папку `.claude/` с Project Knowledge файлами, `CLAUDE.md`, `.gitignore` с правилами для секретов и зависимостей. Инициализирует git-репозиторий, создаёт приватный GitHub-репозиторий через `gh` CLI, делает initial commit, создаёт ветки `main` и `dev`. Если в папке уже есть файлы — предложит переместить их в `old/`.
+1. **`/init-project`** — creates the project structure from a template: a `.claude/` folder with Project Knowledge files, `CLAUDE.md`, a `.gitignore` with rules for secrets and dependencies. Initializes a git repository, creates a private GitHub repository via the `gh` CLI, makes the initial commit, and creates the `main` and `dev` branches. If the folder already has files — it offers to move them into `old/`.
 
-2. **`/init-project-knowledge`** — запускает скилл `project-planning`, который проводит подробное интервью о проекте и заполняет все файлы Project Knowledge (`project.md`, `architecture.md`, `patterns.md`, `deployment.md`), а также создаёт бэклог проекта с фичами и roadmap.
+2. **`/init-project-knowledge`** — runs the `project-planning` skill, which conducts a detailed interview about the project and fills in all Project Knowledge files (`project.md`, `architecture.md`, `patterns.md`, `deployment.md`), and also creates a project backlog with features and a roadmap.
 
-После этого можно начинать разработку фич через `/new-user-spec`.
-
----
-
-## Создание новых skills
-
-Фреймворк расширяется через создание новых skills в таком же стиле:
-
-- **`skill-master`** — гайд и правила по созданию skills: структура, паттерны, типы (процедурные и информационные), шаблоны
-- **`skill-tester`** — полный цикл тестирования skills: проектирование сценариев, запуск с параллельными раннерами, оценка, отчёт
+After that you can start developing features with `/new-user-spec`.
 
 ---
 
-## Справочник
+## Creating new skills
 
-### Все команды
+The framework is extended by creating new skills in the same style:
 
-| Команда | Что делает |
+- **`skill-master`** — a guide and rules for creating skills: structure, patterns, types (procedural and informational), templates
+- **`skill-tester`** — the full skill-testing cycle: designing scenarios, running with parallel runners, evaluation, report
+
+---
+
+## Reference
+
+### All commands
+
+| Command | What it does |
 |---|---|
-| `/init-project` | Создаёт структуру проекта из шаблона, инициализирует git, создаёт приватный GitHub-репозиторий, настраивает ветки (main + dev) |
-| `/init-project-knowledge` | Проводит интервью о проекте, заполняет все файлы Project Knowledge и создаёт бэклог (features + roadmap) |
-| `/new-user-spec` | Проводит интервью с пользователем, исследует код, создаёт спецификацию требований с валидацией (2 валидатора, до 3 итераций) |
-| `/new-tech-spec` | Исследует кодовую базу, создаёт техническую спецификацию с архитектурой, решениями, стратегией тестирования и планом реализации (5 валидаторов) |
-| `/decompose-tech-spec` | Разбивает tech-spec на атомарные задачи с acceptance criteria, TDD-якорями и зависимостями (2 валидатора) |
-| `/do-task` | Выполняет одну задачу: TDD (тесты → код), code review, security audit. Коммит после реализации и после каждого раунда ревью |
-| `/do-feature` | Создаёт команду агентов, распределяет задачи по волнам, каждый агент выполняет задачу параллельно с TDD и ревью |
-| `/write-code` | Пишет код без спецификации: план → тесты → код → code review + security audit |
-| `/done` | Читает спеки и decisions.md, обновляет Project Knowledge, архивирует фичу в `work/completed/` |
+| `/init-project` | Creates the project structure from a template, initializes git, creates a private GitHub repo, sets up branches (main + dev) |
+| `/init-project-knowledge` | Interviews about the project, fills in all Project Knowledge files, and creates the backlog (features + roadmap) |
+| `/new-user-spec` | Interviews the user, researches the code, creates a requirements spec with validation (2 validators, up to 3 iterations) |
+| `/new-tech-spec` | Researches the codebase, creates a technical spec with architecture, decisions, testing strategy, and implementation plan (5 validators) |
+| `/decompose-tech-spec` | Breaks the tech-spec into atomic tasks with acceptance criteria, TDD anchors, and dependencies (2 validators) |
+| `/do-task` | Executes one task: TDD (tests → code), code review, security audit. Commits after implementation and after each review round |
+| `/do-feature` | Creates a team of agents, distributes tasks across waves, each agent executes its task in parallel with TDD and review |
+| `/write-code` | Writes code without a spec: plan → tests → code → code review + security audit |
+| `/done` | Reads the specs and decisions.md, updates Project Knowledge, archives the feature into `work/completed/` |
 
-### Все агенты
+### All agents
 
-Агенты — изолированные субпроцессы со своим контекстом. Получают задачу, делают одну работу, возвращают структурированный результат.
+Agents are isolated subprocesses with their own context. They receive a task, do one job, and return a structured result.
 
-#### Валидаторы и создатели
-| Агент | Что делает |
+#### Validators and creators
+| Agent | What it does |
 |---|---|
-| `userspec-quality-validator` | Проверяет структуру user-spec, покрытие, тестируемость acceptance criteria |
-| `userspec-adequacy-validator` | Проверяет осуществимость решения, масштаб, нет ли over/underengineering |
-| `interview-completeness-checker` | Ищет пробелы в интервью для user-spec |
-| `tech-spec-validator` | Проверяет структуру tech-spec, соответствие шаблону, качество задач |
-| `skeptic` | Ищет миражи — ссылки на несуществующие файлы, функции, API |
-| `completeness-validator` | Двусторонняя трассировка требований user-spec ↔ tech-spec, детекция over/underengineering |
-| `task-creator` | Создаёт task-файлы из плана реализации tech-spec |
-| `task-validator` | Проверяет соответствие task-файлов шаблону, качество описания |
-| `reality-checker` | Проверяет, существуют ли указанные в задачах файлы, функции, зависимости |
-| `skill-checker` | Проверяет соответствие skills стандартам skill-master |
+| `userspec-quality-validator` | Checks user-spec structure, coverage, testability of acceptance criteria |
+| `userspec-adequacy-validator` | Checks feasibility of the solution, scope, no over/underengineering |
+| `interview-completeness-checker` | Looks for gaps in the user-spec interview |
+| `tech-spec-validator` | Checks tech-spec structure, template compliance, task quality |
+| `skeptic` | Hunts for mirages — references to non-existent files, functions, APIs |
+| `completeness-validator` | Bidirectional requirement traceability user-spec ↔ tech-spec, over/underengineering detection |
+| `task-creator` | Creates task files from the tech-spec implementation plan |
+| `task-validator` | Checks task files for template compliance and description quality |
+| `reality-checker` | Checks whether the files, functions, and dependencies referenced in tasks exist |
+| `skill-checker` | Checks skills against skill-master standards |
 
-#### Ревьюеры
-| Агент | Что проверяет |
+#### Reviewers
+| Agent | What it checks |
 |---|---|
-| `code-reviewer` | Качество кода: архитектура, читаемость, error handling, тесты |
-| `code-researcher` | Исследует кодовую базу: файлы, паттерны, тесты, интеграции, риски |
-| `documentation-reviewer` | Качество Project Knowledge: полнота, актуальность, отсутствие bloat |
-| `test-reviewer` | Качество тестов: находит проблемы и предлагает конкретные исправления |
-| `security-auditor` | Безопасность по OWASP Top 10: SQL injection, XSS, auth, криптография |
-| `deploy-reviewer` | CI/CD pipeline: GitHub Actions, secrets management, конфигурация деплоя |
-| `infrastructure-reviewer` | Инфраструктура: структура проекта, Docker, pre-commit hooks, .gitignore |
-| `prompt-reviewer` | Качество LLM-промптов по принципам prompt-master |
+| `code-reviewer` | Code quality: architecture, readability, error handling, tests |
+| `code-researcher` | Researches the codebase: files, patterns, tests, integrations, risks |
+| `documentation-reviewer` | Project Knowledge quality: completeness, accuracy, no bloat |
+| `test-reviewer` | Test quality: finds problems and proposes concrete fixes |
+| `security-auditor` | Security against OWASP Top 10: SQL injection, XSS, auth, cryptography |
+| `deploy-reviewer` | CI/CD pipeline: GitHub Actions, secrets management, deploy configuration |
+| `infrastructure-reviewer` | Infrastructure: project structure, Docker, pre-commit hooks, .gitignore |
+| `prompt-reviewer` | LLM prompt quality against prompt-master principles |
 
 #### QA
-| Агент | Что делает |
+| Agent | What it does |
 |---|---|
-| `pre-deploy-qa` | Запускает тесты, проверяет acceptance criteria из user-spec и tech-spec |
-| `post-deploy-qa` | Верификация на живом окружении через MCP-инструменты (Playwright, curl, Telegram MCP) |
+| `pre-deploy-qa` | Runs tests, checks acceptance criteria from user-spec and tech-spec |
+| `post-deploy-qa` | Verification on the live environment via MCP tools (Playwright, curl, Telegram MCP) |
 
-### Все skills
+### All skills
 
-#### Планирование
-| Skill | Назначение |
+#### Planning
+| Skill | Purpose |
 |---|---|
-| `methodology` | Описание всей методологии: pipeline, структура, принципы |
-| `project-planning` | Интервью о новом проекте → заполнение Project Knowledge + бэклог (features, roadmap) |
-| `user-spec-planning` | Интервью с пользователем → user-spec.md с требованиями |
-| `tech-spec-planning` | Исследование кода → tech-spec.md с архитектурой и планом реализации |
-| `task-decomposition` | Tech-spec → атомарные task-файлы с TDD-якорями |
+| `methodology` | Description of the whole methodology: pipeline, structure, principles |
+| `project-planning` | Interview about a new project → fills Project Knowledge + backlog (features, roadmap) |
+| `user-spec-planning` | Interview with the user → user-spec.md with requirements |
+| `tech-spec-planning` | Code research → tech-spec.md with architecture and implementation plan |
+| `task-decomposition` | Tech-spec → atomic task files with TDD anchors |
 
-#### Разработка
-| Skill | Назначение |
+#### Development
+| Skill | Purpose |
 |---|---|
-| `code-writing` | Процесс написания кода: план → тесты → код → ревью |
-| `feature-execution` | Оркестрация фичи: тимлид создаёт команду агентов, распределяет задачи по волнам |
-| `prompt-master` | Написание, улучшение и проверка промптов для LLM |
+| `code-writing` | The code-writing process: plan → tests → code → review |
+| `feature-execution` | Feature orchestration: a team lead creates a team of agents and distributes tasks across waves |
+| `prompt-master` | Writing, improving, and reviewing prompts for LLMs |
 
-#### Качество
-| Skill | Назначение |
+#### Quality
+| Skill | Purpose |
 |---|---|
-| `code-reviewing` | Методология code review по 11 измерениям: архитектура, безопасность, производительность и т.д. |
-| `test-master` | Стратегия тестирования: тестовая пирамида, когда unit/integration/e2e, как обеспечить качество тестов |
-| `security-auditor` | Аудит безопасности по OWASP Top 10: инъекции, аутентификация, криптография |
-| `pre-deploy-qa` | Приёмочное тестирование: запуск тестов, проверка acceptance criteria без живого окружения |
-| `post-deploy-qa` | Верификация после деплоя на живом окружении через MCP-инструменты |
+| `code-reviewing` | Code review methodology across 11 dimensions: architecture, security, performance, etc. |
+| `test-master` | Testing strategy: the test pyramid, when to use unit/integration/e2e, how to ensure test quality |
+| `security-auditor` | Security audit against OWASP Top 10: injections, authentication, cryptography |
+| `pre-deploy-qa` | Acceptance testing: running tests, checking acceptance criteria without a live environment |
+| `post-deploy-qa` | Post-deploy verification on the live environment via MCP tools |
 
-#### Инфраструктура и документация
-| Skill | Назначение |
+#### Infrastructure and documentation
+| Skill | Purpose |
 |---|---|
-| `infrastructure-setup` | Настройка инфраструктуры нового проекта: фреймворк, Docker, pre-commit hooks (gitleaks), тесты |
-| `deploy-pipeline` | Настройка CI/CD: GitHub Actions, деплой (Vercel, Railway, Fly.io, AWS, VPS), secrets management |
-| `documentation-writing` | Управление Project Knowledge: аудит, обновление, проверка консистентности |
+| `infrastructure-setup` | Setting up a new project's infrastructure: framework, Docker, pre-commit hooks (gitleaks), tests |
+| `deploy-pipeline` | Setting up CI/CD: GitHub Actions, deploy (Vercel, Railway, Fly.io, AWS, VPS), secrets management |
+| `documentation-writing` | Managing Project Knowledge: audit, update, consistency check |
 
-#### Мета
-| Skill | Назначение |
+#### Meta
+| Skill | Purpose |
 |---|---|
-| `skill-master` | Создание и обновление skills: структура, паттерны, правила |
-| `skill-tester` | Полный цикл тестирования skills: проектирование сценариев, запуск, оценка, отчёт |
+| `skill-master` | Creating and updating skills: structure, patterns, rules |
+| `skill-tester` | The full skill-testing cycle: scenario design, runs, evaluation, report |
 
 ---
 
-## Shared — шаблоны и скрипты
+## Shared — templates and scripts
 
-Папка `shared/` содержит исходные материалы, которые используются скиллами и командами:
+The `shared/` folder contains source materials used by skills and commands:
 
-| Папка | Что внутри |
+| Folder | What's inside |
 |---|---|
-| `templates/new-project/` | Шаблон нового проекта: структура `.claude/`, Project Knowledge файлы, CLAUDE.md, .gitignore. Используется командой `/init-project` |
-| `templates/infrastructure/` | Шаблоны инфраструктуры (Docker, CI/CD конфиги). Используются скиллом `infrastructure-setup` |
-| `work-templates/` | Шаблоны рабочих документов: `user-spec.md.template`, `tech-spec.md.template`, `task.md.template`, `decisions.md.template`, `checkpoint.yml.template`, `execution-plan.md.template`. Скиллы копируют их при создании новых спеков и задач |
-| `interview-templates/` | Структуры интервью для скиллов планирования: `feature.yml` (для user-spec), `skill.yml` (для skill-tester) |
-| `scripts/` | Вспомогательные скрипты: `init-feature-folder.sh` — создание work-директории для новой фичи |
+| `templates/new-project/` | New-project template: `.claude/` structure, Project Knowledge files, CLAUDE.md, .gitignore. Used by `/init-project` |
+| `templates/infrastructure/` | Infrastructure templates (Docker, CI/CD configs). Used by the `infrastructure-setup` skill |
+| `work-templates/` | Working-document templates: `user-spec.md.template`, `tech-spec.md.template`, `task.md.template`, `decisions.md.template`, `checkpoint.yml.template`, `execution-plan.md.template`. Skills copy them when creating new specs and tasks |
+| `interview-templates/` | Interview structures for the planning skills: `feature.yml` (for user-spec), `skill.yml` (for skill-tester) |
+| `scripts/` | Helper scripts: `init-feature-folder.sh` — creates the work directory for a new feature |
 
 ---
 
-## Hooks — автоматизация
+## Hooks — automation
 
-Папка `hooks/` содержит хуки Claude Code, которые автоматически срабатывают на определённые события:
+The `hooks/` folder contains Claude Code hooks that fire automatically on certain events:
 
-| Хук | Событие | Что делает |
+| Hook | Event | What it does |
 |---|---|---|
-| `post-compact-restore.sh` | SessionStart (compact) | Восстанавливает контекст feature-execution после компактификации: находит checkpoint, проверяет что текущая сессия — тимлид, выводит инструкции для возобновления работы |
+| `post-compact-restore.sh` | SessionStart (compact) | Restores feature-execution context after compaction: finds the checkpoint, verifies the current session is the team lead, prints instructions to resume work |
 
 ---
 
-## Scripts и .codex — поддержка Codex runtime
+## Scripts and .codex — Codex runtime support
 
-Папка `scripts/`:
+The `scripts/` folder:
 
-| Файл | Что делает |
+| File | What it does |
 |---|---|
-| `sync-to-codex.py` + `sync-to-codex.sh` | Генерирует Codex-совместимые скиллы/команды/агенты и `AGENTS.md` из Claude-источников. CLI поддерживает `--dry-run`, `--apply`, `--project`. |
-| `sync-mcp-to-codex.py` + `sync-mcp-to-codex.sh` | Импортирует MCP-конфиги из `~/.claude/.mcp*.json` и проектов в локальный приватный Codex-конфиг (`~/.codex/mcp-imported/` и блок в `~/.codex/config.toml`). MCP-секреты в публичный репо не уходят. |
+| `sync-to-codex.py` + `sync-to-codex.sh` | Generates Codex-compatible skills/commands/agents and `AGENTS.md` from the Claude sources. The CLI supports `--dry-run`, `--apply`, `--project`. |
+| `sync-mcp-to-codex.py` + `sync-mcp-to-codex.sh` | Imports MCP configs from `~/.claude/.mcp*.json` and projects into the local private Codex config (`~/.codex/mcp-imported/` and a block in `~/.codex/config.toml`). MCP secrets never go to the public repo. |
 
-Папка `.codex/` — pre-generated snapshot Codex runtime: `skills/`, `commands/`, `agents/`. Можно скопировать в `~/.codex/` как есть, или перегенерировать локально (см. раздел "Два runtime" выше).
+The `.codex/` folder is a pre-generated snapshot of the Codex runtime: `skills/`, `commands/`, `agents/`. You can copy it into `~/.codex/` as-is, or regenerate it locally (see the "Two runtimes" section above).
 
-Подробнее про dual-runtime — скилл `methodology`.
-
----
-
-## Требования
-
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) и/или [Codex CLI](https://github.com/openai/codex) — фреймворк поддерживает оба runtime
-- [Context7 MCP сервер](https://github.com/upstash/context7) — агент использует его для получения актуальной документации библиотек вместо того, чтобы полагаться на данные из обучения
-- Python 3.10+ — нужен для `scripts/sync-to-codex.py`, если используется Codex runtime
+More on the dual runtime — the `methodology` skill.
 
 ---
 
-## Лицензия
+## Requirements
 
-MIT License — используйте свободно.
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) and/or [Codex CLI](https://github.com/openai/codex) — the framework supports both runtimes
+- [Context7 MCP server](https://github.com/upstash/context7) — the agent uses it to fetch up-to-date library documentation instead of relying on training data
+- Python 3.10+ — needed for `scripts/sync-to-codex.py` if you use the Codex runtime
 
-## Автор
+---
+
+## License
+
+MIT License — use freely.
+
+## Author
 
 Pavel Molyanov — [molyanov.ru](https://molyanov.ru)

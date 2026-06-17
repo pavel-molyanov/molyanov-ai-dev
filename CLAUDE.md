@@ -1,8 +1,6 @@
 ## Language
-- Communicate with user, plans, plan-mode: Russian
-- Tech docs (code, context, rules, CLAUDE.md, skills): English
-- AI prompts: English
-- User-facing docs (README): Russian
+- Artifacts addressed to the user (chat, plans, plan-mode, interviews, validator summaries, user-spec, README): the language the user writes in.
+- Technical docs, code, code comments, AI prompts, internal logs (tech-spec, tasks, CLAUDE.md, skills): English.
 
 ## Behavior
 

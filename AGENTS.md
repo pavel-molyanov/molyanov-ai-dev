@@ -1,8 +1,6 @@
 ## Language
-- Communicate with user, plans, plan-mode: Russian
-- Tech docs (code, context, rules, AGENTS.md, skills): English
-- AI prompts: English
-- User-facing docs (README): Russian
+- Artifacts addressed to the user (chat, plans, plan-mode, interviews, validator summaries, user-spec, README): the language the user writes in.
+- Technical docs, code, code comments, AI prompts, internal logs (tech-spec, tasks, AGENTS.md, skills): English.
 
 ## Behavior
 
@@ -12,7 +10,7 @@
 
 ## Task Planning
 - Use update_plan for multi-step tasks (>1 step)
-- When user asks for team/swarm of agents: use spawn_agent worker/explorer orchestration, not spawn_agent
+- When user asks for team/swarm of agents: use spawn_agent worker/explorer orchestration, not single-task spawn_agent
 
 ## Security
 
