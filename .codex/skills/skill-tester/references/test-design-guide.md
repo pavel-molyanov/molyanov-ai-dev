@@ -9,6 +9,8 @@ How to create effective test prompts and assertions for skill testing.
 
 Test prompts must be realistic — exactly what a real user would actually type.
 Not abstract requests, but concrete and specific with enough detail to feel real.
+Write prompts in the language the user writes in — real triggers arrive in that
+language, so tests must exercise it too (examples below are in English).
 
 **Bad prompts** (too abstract, test nothing):
 - "Format this data"
@@ -21,11 +23,10 @@ Not abstract requests, but concrete and specific with enough detail to feel real
   something like 'Q4 sales final FINAL v2.xlsx') and she wants me to add
   a column that shows the profit margin as a percentage. The revenue is in
   column C and costs are in column D i think"
-- "Хочу добавить авторизацию через Google в мобильное приложение. Сейчас
-  у нас React Native, бэкенд на FastAPI. Нужно чтобы юзер мог логиниться
-  через гугл и мы сохраняли его профиль"
-- "у меня проект на next.js, нужно добавить страницу /settings где юзер
-  может поменять email и пароль. бд — postgres через prisma"
+- "wanna add Google login to our mobile app. we're on React Native, backend
+  is FastAPI. need the user to sign in with google and we save their profile"
+- "got a next.js project, need to add a /settings page where the user can
+  change email and password. db is postgres via prisma"
 
 ### What Makes a Prompt Realistic
 
@@ -42,7 +43,7 @@ Not abstract requests, but concrete and specific with enough detail to feel real
    This is what 80% of users will ask for.
 
 2. **Edge cases** (1-2 per skill): Where the skill might break:
-   - Ambiguous user input ("ну сделай что-нибудь")
+   - Ambiguous user input ("eh, just do something")
    - Missing context (no project files available)
    - Contradictory requirements
    - Unusually large or small scope
@@ -52,16 +53,16 @@ Not abstract requests, but concrete and specific with enough detail to feel real
 ### Prompt Types by Skill Type
 
 **One-shot skill** (task-manager):
-"Поставь задачу на завтра: купить продукты в 10:00, уведомление за 30 минут."
+"Add a task for tomorrow: buy groceries at 10:00, remind me 30 minutes before."
 
 **Coding skill** (code-writing):
-"Реализуй задачу: ~/.claude/skill-tests/code-writing/scenarios/task-1.md"
+"Implement the task: ~/.claude/skill-tests/code-writing/scenarios/task-1.md"
 
 **Dialogue skill** (user-spec-planning):
-"Хочу добавить авторизацию через Google в мобильное приложение."
+"I want to add Google login to our mobile app."
 
 **Informational skill** (methodology):
-"Как правильно организовать работу с ветками в git?"
+"What's the right way to organize git branch workflow?"
 
 ## Writing Assertions
 
@@ -105,17 +106,17 @@ complex procedural skills can have 15+.
 
 Default persona (do not change unless user explicitly asks):
 
-> Предприниматель, занимается vibe-coding через Claude Code. Не программист —
-> не знает синтаксис, библиотеки, алгоритмы. Есть техническое образование,
-> понимает продукты и архитектуру на уровне "что делает что". Общается прямо,
-> без воды.
+> Entrepreneur doing vibe-coding via Claude Code. Not a programmer — doesn't
+> know syntax, libraries, algorithms. Has a technical background, understands
+> products and architecture at a "what does what" level. Communicates directly,
+> no fluff.
 
 **Edge-case persona modifications** (only for edge-case scenarios):
-- Даёт противоречивые ответы
-- Меняет требования в середине
-- Отвечает "ну сделай как-нибудь" даже на продуктовые вопросы
-- Даёт размытые, неконкретные ответы
-- Перескакивает между темами
+- Gives contradictory answers
+- Changes requirements midway
+- Answers "just do whatever" even to product questions
+- Gives vague, non-specific answers
+- Jumps between topics
 
 ## evals.json Format
 

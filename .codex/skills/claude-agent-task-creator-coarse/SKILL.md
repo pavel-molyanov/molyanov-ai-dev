@@ -68,7 +68,7 @@ Create task file for the specified task from coarse tech-spec. Coarse task cover
 
 5. Edit each section in the copied file using Edit tool. Work through sections top-to-bottom:
    - Frontmatter: replace placeholder values with actual status, depends_on, wave, skills, verify, reviewers, teammate_name
-   - Title: replace `Task N: Название` with actual task number and name
+   - Title: replace `Task N: Name` with actual task number and name
    - Required Skills: replace with actual skills for this task
    - Description: explain the skill's scope in this feature — what the role accomplishes and how it fits the whole
    - What to do: write as a checklist of related steps with commit points between them (see Task File Structure section 4)

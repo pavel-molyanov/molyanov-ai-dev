@@ -112,7 +112,7 @@ Example:
 **Status:** Done
 **Agent:** qa-runner
 **Summary:** QA passed. 391 tests green, 28 acceptance criteria checked (25 passed, 3 not_verifiable). No blockers.
-**Deviations:** Нет.
+**Deviations:** None.
 
 **Verification:**
 - Full report: [logs/working/qa-report.json]

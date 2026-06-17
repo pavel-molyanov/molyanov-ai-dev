@@ -94,7 +94,7 @@ Return findings as JSON. Reason: orchestrator parses this to decide pass/fail an
       "criterion": "Titles generated with correct declensions",
       "source": "user-spec | tech-spec | deferred-from-pre-deploy",
       "status": "passed | failed | blocked",
-      "evidence": "Checked live output, title 'В компании X работает...' uses correct declension",
+      "evidence": "Checked live output, generated title uses correct declension/grammar",
       "manualVerificationPlan": "Only if blocked — what the user should check, when, how"
     }
   ],

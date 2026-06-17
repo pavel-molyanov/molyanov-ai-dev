@@ -29,7 +29,7 @@ Report what needs to be fixed.
 ### Universal checks (all skills)
 
 - [ ] `name` in kebab-case, ≤64 characters
-- [ ] `description` < 1024 characters, includes "Use when:" with concrete trigger phrases (5-10 phrases, both Russian and English if applicable)
+- [ ] `description` < 1024 characters, includes "Use when:" with concrete trigger phrases (5-10 phrases, English plus the user's own language if applicable)
 - [ ] SKILL.md body < 500 lines. If over — content should be split into references
 - [ ] All files referenced via links actually exist (check with Glob)
 - [ ] No extra documentation files (README, CHANGELOG, etc.) — only SKILL.md + scripts/ + references/ + assets/

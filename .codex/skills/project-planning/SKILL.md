@@ -190,4 +190,4 @@ Show user the list of created files with links. Include ux-guidelines.md and bac
 
 After approval, ask user if they want to commit. If yes — commit all created documentation files.
 
-Final message: "Документация заполнена! Можно начинать разработку."
+Final message (in the user's language): "Documentation is complete — you can start development."

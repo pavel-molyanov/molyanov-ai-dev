@@ -12,58 +12,63 @@ type: feature
 size: S
 ---
 
-# User Spec: [Название фичи/фикса]
+<!--
+This is a scaffold. Section headers below are in English (stable anchors for
+validators). Fill the CONTENT in the language the user writes in.
+-->
 
-## Что делаем
-[2-3 предложения: суть фичи/фикса]
+# User Spec: [feature/fix name]
 
-## Зачем
-[Какую проблему решаем / какую ценность даем]
+## What we're building
+[2-3 sentences: the essence of the feature/fix]
 
-## Как должно работать
-[Пользовательский сценарий в свободной форме:
-1. Пользователь делает X
-2. Система отвечает Y
-3. Результат Z]
+## Why
+[What problem we solve / what value we deliver]
 
-## Критерии приёмки
-- [ ] [Критерий 1 - что должно работать]
-- [ ] [Критерий 2]
-- [ ] [Критерий 3]
+## How it should work
+[User scenario in free form:
+1. User does X
+2. System responds Y
+3. Result Z]
 
-## Ограничения
-[Технические и бизнес-ограничения: совместимость, безопасность, масштабируемость]
+## Acceptance Criteria
+- [ ] [Criterion 1 — what must work]
+- [ ] [Criterion 2]
+- [ ] [Criterion 3]
 
-## Риски
-- **Риск 1:** [описание проблемы, которая может возникнуть]. **Митигация:** [что делаем, чтобы снизить риск].
-- **Риск 2:** [описание]. **Митигация:** [действие].
+## Constraints
+[Technical and business constraints: compatibility, security, scalability]
 
-[Если рисков нет — написать "Рисков не выявлено".]
+## Risks
+- **Risk 1:** [description of the problem that may occur]. **Mitigation:** [what we do to reduce the risk].
+- **Risk 2:** [description]. **Mitigation:** [action].
 
-## Технические решения
-- Мы решили [делать X], потому что [Y].
-- Мы решили [не делать Z], потому что [W].
+[If there are no risks — write "No risks identified".]
 
-[Решения из интервью простым языком. Без альтернатив — только факты.]
+## Technical Decisions
+- We decided to [do X] because [Y].
+- We decided to [not do Z] because [W].
 
-## Тестирование
+[Decisions from the interview in plain language. No alternatives — only facts.]
 
-**Unit-тесты:** делаются всегда, не обсуждаются.
+## Testing
 
-**Интеграционные тесты:** [делаем / не делаем] — [причина].
+**Unit tests:** always done, not up for discussion.
 
-**E2E тесты:** [делаем / не делаем] — [причина].
+**Integration tests:** [yes / no] — [reason].
 
-## Как проверить
+**E2E tests:** [yes / no] — [reason].
 
-### Агент проверяет
+## How to Verify
 
-| Шаг | Инструмент | Ожидаемый результат |
+### Agent verifies
+
+| Step | Tool | Expected result |
 |-----|-----------|-------------------|
-| [1. Описание шага] | [curl / playwright / bash / MCP] | [Что должно произойти] |
-| [2. Описание шага] | [инструмент] | [ожидаемый результат] |
+| [1. Step description] | [curl / playwright / bash / MCP] | [What should happen] |
+| [2. Step description] | [tool] | [expected result] |
 
-### Пользователь проверяет
-- [Что проверить — как проверить — зачем это нужно проверить руками]
+### User verifies
+- [What to check — how to check — why it needs manual checking]
 
-[Если всё проверяет агент — секцию "Пользователь проверяет" убрать.]
+[If the agent verifies everything — remove the "User verifies" section.]

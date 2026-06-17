@@ -20,7 +20,7 @@ Create technical specification with coarse implementation plan: one task per ski
 
 **Input:** `work/{feature}/user-spec.md` + Project Knowledge
 **Output:** `work/{feature}/tech-spec.md` (approved)
-**Language:** Technical documentation in English, communication in Russian
+**Language:** Technical documentation in English; communication with the user in the language the user writes in
 
 ## Phase 1: Load Context
 

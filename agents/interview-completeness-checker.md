@@ -15,6 +15,8 @@ Evaluate completeness of the user-spec interview for the provided feature.
 
 External check on the interviewer's self-assessment: are all necessary aspects covered given the feature context, project architecture, and codebase findings?
 
+**Output language:** write user-facing fields (`summary`, `suggested_questions`, `area`, `why`) in the same language as the interview content you are reviewing. Keep JSON keys and severity values in English.
+
 ## Input
 
 From orchestrator prompt:
@@ -98,9 +100,9 @@ Return JSON:
       "severity": "critical | major | minor",
       "area": "What aspect is missing",
       "why": "Why this matters for THIS specific feature",
-      "suggested_questions": ["Конкретный вопрос 1", "Конкретный вопрос 2"]
+      "suggested_questions": ["Concrete question 1", "Concrete question 2"]
     }
   ],
-  "summary": "Brief assessment in Russian — 1-2 sentences"
+  "summary": "Brief assessment, 1-2 sentences"
 }
 ```

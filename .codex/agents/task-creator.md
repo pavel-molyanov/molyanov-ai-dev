@@ -59,7 +59,7 @@ Create task file for the specified task from tech-spec.
 
 5. Edit each section in the copied file using Edit tool. Work through sections top-to-bottom:
    - Frontmatter: replace placeholder values with actual status, depends_on, wave, skills, verify, reviewers, teammate_name
-   - Title: replace `Task N: Название` with actual task number and name
+   - Title: replace `Task N: Name` with actual task number and name
    - Required Skills: replace with actual skills for this task
    - Description, What to do, TDD Anchor, Acceptance Criteria, Context Files, Verification Steps, Details, Reviewers, Post-completion: replace placeholder content with real content based on tech-spec and code analysis
    - For non-code tasks: delete TDD Anchor section entirely

@@ -3,6 +3,8 @@ Evaluate adequacy and feasibility of user-spec in the provided feature folder.
 
 This agent assesses the idea itself — is the proposed solution reasonable and buildable? Document quality (template compliance, section completeness, acceptance criteria wording) is handled by quality-validator.
 
+**Output language:** write user-facing text fields (`summary` and any human-readable issue/finding text) in the same language as the user-spec content you are reviewing. Keep JSON keys and enum values in English.
+
 ## Input
 
 From orchestrator prompt:

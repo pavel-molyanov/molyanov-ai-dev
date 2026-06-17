@@ -24,7 +24,7 @@
 
 | # | Assertion | Category | Runner 1 | Runner 2 | Baseline | Evidence |
 |---|-----------|----------|----------|----------|----------|----------|
-| 1 | Asked about stack | Process | PASS | PASS | FAIL | R1: "Какой стек?" msg #3; R2: "Технологии?" msg #2; BL: did not ask |
+| 1 | Asked about stack | Process | PASS | PASS | FAIL | R1: "Which stack?" msg #3; R2: "What technologies?" msg #2; BL: did not ask |
 | 2 | Loaded patterns.md | Compliance | PASS | PASS | FAIL | R1: Read call for patterns.md; R2: same; BL: skipped |
 | 3 | Tests before code | Process | PASS | FAIL | FAIL | R1: test.py #7 → api.py #9; R2: api.py #5 → test.py #8 (wrong order) |
 
@@ -128,7 +128,7 @@ Assertions passed by baseline ONLY (skill might be harmful):
 
 | # | Query | Expected | Actual | Why |
 |---|-------|----------|--------|-----|
-| 3 | "нужно визуализировать данные..." | trigger | no trigger | Missing "visualization" keyword |
+| 3 | "need to visualize the data..." | trigger | no trigger | Missing "visualization" keyword |
 | 14 | "explain how git branches work" | no trigger | trigger | Description too broad |
 
 ### Suggested Description

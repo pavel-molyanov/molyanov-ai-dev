@@ -1,37 +1,42 @@
-# [Название проекта]
+<!--
+Scaffold for the project README. README is for humans — write the final content
+in the language the user writes in. Headers below are a starting point; localize them too.
+-->
 
-> **Это README для владельца проекта**, а не для AI-агентов.
-> Инструкции для агентов находятся в CLAUDE.md и .claude/skills/project-knowledge/references/
+# [Project name]
 
-## О проекте
+> **This README is for the project owner**, not for AI agents.
+> Instructions for agents live in CLAUDE.md and .claude/skills/project-knowledge/references/
 
-[Краткое описание: что делает проект и зачем он нужен]
+## About
 
-## Структура проекта
+[Short description: what the project does and why it exists]
+
+## Project structure
 
 ```
-.claude/                    # База знаний для AI-агентов
+.claude/                    # Knowledge base for AI agents
 ├── skills/
 │   └── project-knowledge/  # Project docs (architecture, patterns, etc.)
 └── ...
 
-backlog.md        # Идеи фич и баги (что делать потом)
-work/             # Активные фичи и баги (что делаем сейчас)
-├── templates/    # Шаблоны для спеков и задач
-└── [фичи]/       # Каждая фича в своей папке
+backlog.md        # Feature ideas and bugs (what to do later)
+work/             # Active features and bugs (what we're doing now)
+├── templates/    # Templates for specs and tasks
+└── [features]/   # Each feature in its own folder
 
-src/              # Исходный код
+src/              # Source code
 ```
 
-## Методология разработки
+## Development methodology
 
-Проект использует **spec-driven подход** с AI-агентами:
+The project uses a **spec-driven approach** with AI agents:
 
-1. **User Spec** (русский) → описываем ЧТО и ЗАЧЕМ нужно
-2. **Tech Spec** (английский) → описываем КАК реализовать
-3. **Tasks** → декомпозиция на задачи
-4. **Implementation** → AI-агент делает код
+1. **User Spec** (user's language) → describe WHAT and WHY
+2. **Tech Spec** (English) → describe HOW to implement
+3. **Tasks** → decomposition into tasks
+4. **Implementation** → AI agent writes the code
 
-Все фичи и баги ведутся в папке `work/`.
+All features and bugs are tracked in the `work/` folder.
 
-- **guides/** - гайды по работе с методологией
+- **guides/** — guides for working with the methodology

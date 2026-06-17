@@ -13,6 +13,8 @@ Validate quality and completeness of user-spec in the provided feature folder.
 This agent checks the document itself — is it complete, consistent, and well-structured?
 Solution adequacy (feasibility, overengineering, better alternatives) is handled by userspec-adequacy-validator.
 
+**Output language:** write user-facing fields (`summary`, `issue`, `fix`, `location`, topic lists) in the same language as the user-spec content you are reviewing. Keep JSON keys and enum values in English.
+
 ## Input
 
 From orchestrator prompt:
@@ -33,10 +35,10 @@ Err on the side of flagging issues. A false positive that gets reviewed and dism
 All content is present and substantive.
 
 - Every section from template is filled with real content
-- No placeholders: `[TODO]`, `[TBD]`, `[описание]`, `[Критерий N]`, empty brackets, `TBD`, `TODO`, `...`, `(описать позже)`, `(уточнить)`, `N/A` in required sections, `(будет добавлено)`
+- No leftover template placeholders: unfilled square brackets like `[DATE]`, `[feature/fix name]`, `[Criterion 1 — what must work]`, any `[...]` placeholder, `TBD`, `TODO`, `...`, `N/A` in required sections, or their equivalents in the user's language
 - No empty sections (heading present but no content below)
-- "Что делаем" is self-contained — understandable without reading interview
-- "Зачем" explains concrete user value: WHO (role/persona) + WHAT action + WHAT problem it solves. Blacklist: "улучшить UX", "повысить эффективность" (without metrics), "улучшить качество" (of what?), "оптимизировать процесс" (which?), "обеспечить надежность" (of what?), "ускорить работу" (what work?)
+- "What we're building" is self-contained — understandable without reading interview
+- "Why" explains concrete user value: WHO (role/persona) + WHAT action + WHAT problem it solves. Reject vague value claims (in any language) such as: "improve UX", "increase efficiency" (without metrics), "improve quality" (of what?), "optimize the process" (which?), "ensure reliability" (of what?), "speed up work" (what work?)
 
 **Interview coverage** (the most important sub-check): read interview.yml, extract all discussed topics from conversation_history entries. Verify each topic appears in user-spec. Track covered and missing — report in `interview_coverage` field.
 
@@ -44,8 +46,8 @@ All content is present and substantive.
 
 Edge case and risk sections exist and have real content.
 
-- "Риски" section present and non-empty (or explicitly states "Рисков не выявлено")
-- Each listed risk has a mitigation ("Риск: X" without "Митигация: Y" → major finding)
+- "Risks" section present and non-empty (or explicitly states "No risks identified")
+- Each listed risk has a mitigation (a "Risk: X" without a matching "Mitigation: Y" → major finding)
 - Edge cases mentioned somewhere in the spec (scenarios, criteria, or constraints)
 
 Whether listed edge cases are *sufficient* for the feature is assessed by userspec-adequacy-validator.
@@ -54,20 +56,20 @@ Whether listed edge cases are *sufficient* for the feature is assessed by usersp
 
 Every criterion is testable and unambiguous.
 
-- Each criterion describes specific observable behavior, not vague quality. Blacklist: "работает корректно", "быстро отвечает", "удобный интерфейс", "хорошее качество", "надёжно работает", "интуитивно понятно", "properly handles", "ensures quality", "is responsive", "handles errors" (without specifying which), "performs well", "is secure", "meets requirements", "эффективно", "оптимально", "безопасно работает", "корректно обрабатывает" (without specifying what), "стабильно работает"
+- Each criterion describes specific observable behavior, not vague quality. Reject vague phrasing in any language, e.g.: "works correctly", "responds fast", "convenient interface", "good quality", "works reliably", "intuitive", "properly handles", "ensures quality", "is responsive", "handles errors" (without specifying which), "performs well", "is secure", "meets requirements", "efficient", "optimal", "works safely", "handles correctly" (without specifying what), "works stably"
 - Untestable criteria are severity `critical`, not `major`. A criterion that cannot be verified is not a criterion — it is noise that gives false confidence. Examples of untestable: "works correctly", "good quality", "fast enough", "user-friendly", "handles errors properly" (without specifying which errors and how)
 - Each criterion can be verified — either by automated test or manual check with concrete expected result
 - No duplicate or overlapping criteria
-- Criteria cover the scope described in "Как должно работать" (no orphan flows without criteria)
+- Criteria cover the scope described in "How it should work" (no orphan flows without criteria)
 - For features of size M or L, at least one criterion must describe error/failure behavior (what happens when something goes wrong). Zero negative criteria for M/L features → severity `major`
 
 ## Check 4: Contradictions
 
 No conflicts between sections.
 
-- "Ограничения" don't contradict "Как должно работать"
+- "Constraints" don't contradict "How it should work"
 - Acceptance criteria are consistent with described user flow
-- "Технические решения" don't contradict "Ограничения"
+- "Technical Decisions" don't contradict "Constraints"
 - Size (S/M/L) is consistent with actual scope (S with 15 acceptance criteria → contradiction)
 
 ## Check 5: Template Compliance
@@ -75,9 +77,9 @@ No conflicts between sections.
 Document structure matches the expected template.
 
 - Frontmatter present with fields: `created` (date), `status` (draft/approved), `type` (feature/bug/refactoring), `size` (S/M/L)
-- Required sections present: Что делаем, Зачем, Как должно работать, Критерии приёмки, Ограничения, Риски, Технические решения, Тестирование, Как проверить
-- "Тестирование" contains decision on integration/E2E tests WITH rationale (not just "делаем"/"не делаем" without why)
-- "Как проверить" split into "Агент проверяет" and "Пользователь проверяет" subsections
+- Required sections present: What we're building, Why, How it should work, Acceptance Criteria, Constraints, Risks, Technical Decisions, Testing, How to Verify
+- "Testing" contains decision on integration/E2E tests WITH rationale (not just "yes"/"no" without why)
+- "How to Verify" split into "Agent verifies" and "User verifies" subsections
 
 ## Check 6: Size Check
 
@@ -91,8 +93,8 @@ Three statuses for this check: `pass` (declared, within thresholds), `warning` (
 
 ## Severity Classification
 
-- **critical** — blocks approval. Missing required section content, interview topic lost (discussed but absent from spec), untestable acceptance criterion ("работает корректно"), direct contradiction between sections, missing frontmatter field.
-- **major** — should be fixed. Vague but not untestable criteria, incomplete edge case coverage, risk listed without mitigation, "Тестирование" decision without rationale.
+- **critical** — blocks approval. Missing required section content, interview topic lost (discussed but absent from spec), untestable acceptance criterion (e.g. "works correctly"), direct contradiction between sections, missing frontmatter field.
+- **major** — should be fixed. Vague but not untestable criteria, incomplete edge case coverage, risk listed without mitigation, "Testing" decision without rationale.
 - **minor** — improvement. Better wording available, section ordering, stylistic.
 
 ## Check Status Rules
@@ -131,6 +133,6 @@ Write JSON report to `{feature_path}/logs/userspec/quality-review.json`:
     "covered": ["topic 1", "topic 2"],
     "missing": ["topic from interview not found in user-spec"]
   },
-  "summary": "Brief verdict — 1-2 sentences in Russian"
+  "summary": "Brief verdict — 1-2 sentences"
 }
 ```

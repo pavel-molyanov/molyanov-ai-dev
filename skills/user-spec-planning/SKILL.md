@@ -17,14 +17,14 @@ Output: `work/{feature}/user-spec.md` with status `approved`.
 
 ## Interview Style
 
-Conduct interview in Russian. Be thorough and opinionated — an engaged co-thinker who actively proposes solutions and challenges weak answers.
+Conduct the interview in the language the user writes in. Be thorough and opinionated — an engaged co-thinker who actively proposes solutions and challenges weak answers.
 
 **How to interview:**
 - 3-4 questions per batch. Run as many batches as needed until the cycle's items are fully covered.
-- Propose solutions based on Project Knowledge: "В architecture.md описан паттерн X — думаю, здесь нужно Y. Согласен?"
-- Challenge with substance — concrete counterexamples, code references, unexplored scenarios: "А что если пользователь сделает Z? В коде модуль Q не обрабатывает этот случай."
+- Propose solutions based on Project Knowledge (example in English): "architecture.md describes pattern X — I think we need Y here. Agree?"
+- Challenge with substance — concrete counterexamples, code references, unexplored scenarios: "What if the user does Z? In the code, module Q doesn't handle this case."
 - Accept the answer after one substantive challenge and move on to the next gap.
-- When user says "не знаю": help think through it (examples, common patterns). Optional item → mark TBD. Required item → break into simpler questions.
+- When the user says "I don't know": help think through it (examples, common patterns). Optional item → mark TBD. Required item → break into simpler questions.
 
 **Interview depth** depends on feature size (S/M/L in interview metadata):
 - S (1-3 files, local fix): focused interview, core behavior
@@ -36,7 +36,7 @@ Conduct interview in Russian. Be thorough and opinionated — an engaged co-thin
 ### Phase 0: Init
 
 1. Check for existing interview: look in `work/*/logs/userspec/interview.yml` for `metadata.status: in_progress`. If found — load, show discussed topics summary, resume. If multiple found — show list, let user choose.
-2. Get task description: "Опиши, что хочешь сделать."
+2. Get task description (ask in the user's language): "Describe what you want to do."
 3. Determine work_type (feature / bug / refactoring) from description.
 4. Propose feature name (kebab-case), get user confirmation.
 5. Run `~/.claude/shared/scripts/init-feature-folder.sh {name}` — creates folder structure with interview.yml.
@@ -73,13 +73,13 @@ If during later phases a gap is discovered — launch `code-researcher` again wi
 
 **Scope:** `phase2_user_experience` + `phase3_integration` items.
 
-1. Summarize understanding: "Я понял задачу так: [X]. Делать планирую так: [Y, based on code]."
-2. Questions based on code findings: "Нашёл модуль X, который делает Y — переиспользуем?"
+1. Summarize understanding (examples in English; ask in the user's language): "I understand the task as: [X]. I plan to do it like: [Y, based on code]."
+2. Questions based on code findings: "Found module X that does Y — reuse it?"
 3. Cover deploy and user actions (items `deploy_approach`, `manual_user_actions`):
-   - "Нужны ли ручные шаги для запуска? (создать бота, получить API ключи, настроить сервис, зарегистрироваться где-то)"
-   - "Как деплоить? Что нужно настроить? (уже есть CI/CD, нужно настроить, ручной деплой)"
-   - "Как проверить что работает после деплоя? (MCP-инструменты, curl, ручная проверка)"
-   - "Что можно проверить прямо во время разработки, без деплоя? (вызвать внешний API, запустить локально, проверить конфиг, потыкать UI на localhost, протестировать промпт)"
+   - "Are manual steps needed to launch? (create a bot, get API keys, set up a service, register somewhere)"
+   - "How to deploy? What needs configuring? (CI/CD already exists, needs setup, manual deploy)"
+   - "How to verify it works after deploy? (MCP tools, curl, manual check)"
+   - "What can be checked during development, without deploy? (call an external API, run locally, check config, poke the UI on localhost, test a prompt)"
 4. Run interview loop on phase2 + phase3 items.
 
 ### Phase 5: Cycle 3 — Review & Finalize
@@ -103,10 +103,10 @@ Launch `interview-completeness-checker` subagent (Task tool, sonnet) with featur
    - Copy `~/.claude/shared/work-templates/user-spec.md.template` → `work/{feature}/user-spec.md`
    - Edit sections one by one using Edit tool, replacing placeholders with interview data
    Reason: agent sees template structure and comments while editing each section, preventing drift from template format.
-2. Content rules:
-   - "Что делаем" — self-contained, understandable without the interview
-   - "Зачем" — concrete user value, not "улучшить UX"
-   - Acceptance criteria — testable, no "работает корректно"
+2. Content rules (section headers stay as in the template — English; fill content in the language the user writes in):
+   - "What we're building" — self-contained, understandable without the interview
+   - "Why" — concrete user value, not vague claims like "improve UX"
+   - Acceptance criteria — testable, no vague "works correctly"
    - Every discussed topic from interview must appear in the spec
 3. If feature seems large (>10 criteria, >3 user flows, >5 integrations) — suggest splitting.
 

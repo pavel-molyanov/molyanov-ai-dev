@@ -19,8 +19,8 @@ ls ~/.claude/tmp/interview-skill-*.yml 2>/dev/null
 ```
 
 If found:
-- Read file, show recap: "Нашёл незавершённое интервью по скиллу {name}"
-- Ask: "Продолжить или начать заново?"
+- Read file, show recap: "Found an unfinished interview for skill {name}"
+- Ask: "Continue or start over?"
 - If continue: resume from current state
 - If restart: archive old file, create new
 
@@ -49,27 +49,29 @@ Set `interview_metadata.started` to current timestamp.
 
 ## Example Questions
 
+Ask these in the language the user writes in (examples below are in English).
+
 ### Phase 1: Skill Overview
 
-- "Как называется скилл? Предложи описательное имя."
-- "Какую проблему решает этот скилл? Зачем он нужен?"
-- "Это пошаговый процесс с чёткой последовательностью (процедурный скилл) или набор знаний/методология без строгого порядка (информационный скилл)?"
-- "Когда скилл должен активироваться? Какие фразы пользователя его триггерят?"
-- "Чего скилл НЕ должен делать? Что выходит за рамки?"
+- "What is the skill called? Suggest a descriptive name."
+- "What problem does this skill solve? Why is it needed?"
+- "Is it a step-by-step process with a clear sequence (procedural skill) or a body of knowledge/methodology without strict order (informational skill)?"
+- "When should the skill activate? Which user phrases trigger it?"
+- "What should the skill NOT do? What is out of scope?"
 
 ### Phase 2: Usage Scenarios
 
-- "Приведи 2-3 конкретных примера использования скилла."
-- "Какие граничные случаи могут быть? Что если пользователь даст неполную информацию?"
-- "Что может пойти не так? Как скилл должен обрабатывать ошибки?"
+- "Give 2-3 concrete examples of using the skill."
+- "What edge cases might occur? What if the user provides incomplete information?"
+- "What could go wrong? How should the skill handle errors?"
 
 ### Phase 3: Output & Resources
 
-- "Что скилл должен производить в результате? Файлы, сообщения, действия?"
-- "Нужны ли скиллу вспомогательные ресурсы: скрипты, референсы, ассеты?"
-- "Какие внешние инструменты нужны? MCP серверы, API, CLI?"
+- "What should the skill produce as a result? Files, messages, actions?"
+- "Does the skill need supporting resources: scripts, references, assets?"
+- "What external tools are needed? MCP servers, APIs, CLIs?"
 
-## Handling "Не знаю"
+## Handling "I don't know"
 
 If user doesn't know:
 1. Explain why this matters

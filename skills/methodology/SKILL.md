@@ -30,7 +30,7 @@ The full path from idea to production. Each step has a command, a skill behind i
 
 ### Step 1: User Spec — `/new-user-spec`
 
-**What:** Structured interview to capture requirements in human-readable form (Russian).
+**What:** Structured interview to capture requirements in human-readable form (in the user's language).
 
 **Process:**
 - Agent reads Project Knowledge files to understand the project
@@ -222,7 +222,7 @@ Features and roadmap live in the project backlog (external to PK).
 
 ```
 work/{feature}/
-├── user-spec.md          # Requirements (Russian, for human)
+├── user-spec.md          # Requirements (user's language, for human)
 ├── tech-spec.md          # Architecture (English, for agent)
 ├── decisions.md          # Decisions made during implementation
 ├── tasks/

@@ -60,7 +60,7 @@ mkdir -p "$FEATURE_DIR/logs/working"
 # user-spec.md
 if [[ ! -f "$FEATURE_DIR/user-spec.md" ]]; then
   sed -e "s/\[DATE\]/$TODAY/g" \
-      -e "s/\[Название фичи\/фикса\]/$FEATURE_NAME/g" \
+      -e "s/\[feature\/fix name\]/$FEATURE_NAME/g" \
       "$TEMPLATES_DIR/user-spec.md.template" > "$FEATURE_DIR/user-spec.md"
 fi
 

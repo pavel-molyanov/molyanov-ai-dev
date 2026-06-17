@@ -124,7 +124,7 @@ description: |
 **Rules:**
 1. **Be specific** — Include key terms that match user requests
 2. **List trigger phrases** — Real phrases users actually say (5-10 phrases)
-3. **Include variations** — "техспек" AND "составь тз" (different ways to say same thing)
+3. **Include variations** — "tech-spec" AND "write a spec" (different ways to say same thing); include the user's own language alongside English
 
 **Bad:**
 ```yaml
@@ -144,7 +144,7 @@ Why good: Specific actions, concrete trigger phrases.
 **How to gather trigger phrases:**
 1. Think: "What would I actually say to invoke this skill?"
 2. Ask: "How would different users phrase this request?"
-3. Include: Common typos, informal variants, both Russian and English if applicable
+3. Include: Common typos, informal variants, English plus the user's own language if applicable
 
 #### Undertriggering Problem
 

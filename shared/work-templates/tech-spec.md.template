@@ -9,7 +9,7 @@ size: S | M | L
 
 ## Solution
 
-Technical approach. (Длина зависит от задачи — без ограничений.)
+Technical approach. (Length depends on the task — no limit.)
 
 ## Architecture
 
@@ -70,7 +70,7 @@ DB schemas, interfaces, types. Skip if N/A.
 
 ## Agent Verification Plan
 
-**Source:** user-spec "Как проверить" section.
+**Source:** user-spec "How to Verify" section.
 
 ### Verification approach
 How agent verifies beyond automated tests.
@@ -101,12 +101,12 @@ None
 
 ## Acceptance Criteria
 
-Технические критерии приёмки (дополняют пользовательские из user-spec):
+Technical acceptance criteria (complement the user-facing ones from user-spec):
 
-- [ ] API возвращает корректные коды ответов (200, 201, 400, 404, 500)
-- [ ] Миграции БД применяются и откатываются без ошибок
-- [ ] Все тесты проходят (unit, integration если есть)
-- [ ] Нет регрессий в существующих тестах
+- [ ] API returns correct response codes (200, 201, 400, 404, 500)
+- [ ] DB migrations apply and roll back without errors
+- [ ] All tests pass (unit, integration if present)
+- [ ] No regressions in existing tests
 - [ ] ...
 
 ## Implementation Tasks
@@ -119,10 +119,10 @@ None
      Verify-user: agent asks user to verify something (UI, behavior, experience).
      Both fields optional — omit if task is internal logic fully covered by tests. -->
 
-### Wave 1 (независимые)
+### Wave 1 (independent)
 
 #### Task 1: [Name]
-- **Description:** Создать REST-эндпоинт для регистрации пользователей. Нужен для MVP авторизации. Результат: POST /api/users возвращает 201.
+- **Description:** Create a REST endpoint for user registration. Needed for the auth MVP. Result: POST /api/users returns 201.
 - **Skill:** code-writing
 - **Reviewers:** code-reviewer, security-auditor, test-reviewer
 - **Verify-smoke:** `curl -X POST localhost:3000/api/users -d '{"name":"test","email":"test@test.com"}' -H 'Content-Type: application/json'` → 201
@@ -130,17 +130,17 @@ None
 - **Files to read:** `src/api/index.ts`, `src/middleware/auth.ts`
 
 #### Task 2: [Name]
-- **Description:** Добавить форму создания пользователя (name, email, role). Связывает UI с API из Task 1. Результат: заполненная форма отправляет POST /api/users.
+- **Description:** Add a user creation form (name, email, role). Wires the UI to the API from Task 1. Result: a filled-in form sends POST /api/users.
 - **Skill:** code-writing
 - **Reviewers:** code-reviewer, test-reviewer
 - **Verify-user:** open localhost:3000/users → form renders, submit creates user
 - **Files to modify:** `src/components/UserForm.tsx`
 - **Files to read:** `src/components/BaseForm.tsx`, `src/hooks/useValidation.ts`
 
-### Wave 2 (зависит от Wave 1)
+### Wave 2 (depends on Wave 1)
 
 #### Task 3: [Name]
-- **Description:** Интегрировать отправку welcome-email при создании пользователя. Асинхронно, не блокирует основной flow. Результат: после POST /api/users уходит email.
+- **Description:** Integrate sending a welcome email on user creation. Asynchronous, does not block the main flow. Result: after POST /api/users an email is sent.
 - **Skill:** code-writing
 - **Reviewers:** code-reviewer, security-auditor, test-reviewer
 - **Files to modify:** `src/services/notification.ts`

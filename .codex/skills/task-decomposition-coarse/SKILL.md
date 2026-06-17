@@ -17,14 +17,14 @@ Decompose coarse tech-spec Implementation Tasks into individual task files with 
 
 **Input:** `work/{feature}/tech-spec.md` (status: approved, produced by tech-spec-planning-coarse)
 **Output:** `work/{feature}/tasks/*.md` (validated)
-**Language:** Task files in English, communication in Russian
+**Language:** Task files in English; communication with the user in the language the user writes in
 
 ## Phase 1: Create Tasks
 
 1. Ask user for feature name if not provided.
 
 2. Read `work/{feature}/tech-spec.md`. Check frontmatter `status: approved`.
-   If not approved — tell user: "tech-spec не утверждён. Сначала запусти `/new-tech-spec-coarse` и доведи до approved." Stop.
+   If not approved — tell the user (in their language): "tech-spec is not approved. Run `/new-tech-spec-coarse` first and get it to approved." Stop.
 
 3. Read `work/{feature}/user-spec.md`.
 
@@ -79,7 +79,7 @@ Launch both in parallel:
    - task-creator-coarse reads existing task, applies fixes, overwrites file
 4. After each validation round, git commit: `chore(tasks): validation round {N} — {summary}`
 5. Re-validate fixed tasks. Maximum 3 iterations.
-6. If problems remain after 3rd iteration — show user: "Вот что осталось — давай решим вместе."
+6. If problems remain after 3rd iteration — show the user (in their language): "Here's what's left — let's resolve it together."
 
 ### Cross-Task Integration Check
 

@@ -10,6 +10,8 @@ Codex does not have native Claude custom agent types. Use this as a role/referen
 
 Validate completeness of requirements coverage in a feature folder.
 
+**Output language:** write the user-facing `summary` and any human-readable finding text in the same language as the user-spec content. Keep JSON keys, enum values, and code identifiers in English.
+
 ## Input
 
 Orchestrator provides `feature_path` — path to feature folder (e.g., `work/my-feature`).
@@ -46,7 +48,7 @@ Acceptable without user-spec tracing: infrastructure and engineering additions (
 
 Solution section must contain real technical substance beyond user-spec.
 
-- Compare Solution section with user-spec's "Что делаем" and "Как должно работать". If Solution merely paraphrases user-spec without adding technical approach, architecture decisions, or implementation strategy → finding type `shallow_solution`, severity `critical`
+- Compare Solution section with user-spec's "What we're building" and "How it should work". If Solution merely paraphrases user-spec without adding technical approach, architecture decisions, or implementation strategy → finding type `shallow_solution`, severity `critical`
 - Solution must mention specific technical components, patterns, or approaches. Generic solution like "We'll implement the feature using our stack" is not a solution — it's a tautology
 - Architecture section must justify chosen approach. "Use React" without explaining WHY this approach and WHAT components → finding type `shallow_solution`, severity `major`
 

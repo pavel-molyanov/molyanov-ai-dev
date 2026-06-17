@@ -113,7 +113,7 @@ CLAUDE.md and README.md are entry points, not documentation. Keep them minimal â
 
 **CLAUDE.md** (for AI agents): project name, one-line description, reference to project-knowledge skill, backlog path, default branch. Template: `~/.claude/shared/templates/new-project/CLAUDE.md`.
 
-**README.md** (for humans, in Russian): project title, purpose, folder structure overview, link to references/. Template: `~/.claude/shared/templates/new-project/README.md`.
+**README.md** (for humans, in the user's language): project title, purpose, folder structure overview, link to references/. Template: `~/.claude/shared/templates/new-project/README.md`.
 
 When auditing, verify that CLAUDE.md and README.md stay minimal â€” detailed info belongs in project-knowledge.
 

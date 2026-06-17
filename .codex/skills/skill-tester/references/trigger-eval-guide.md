@@ -24,7 +24,7 @@ Think about **coverage** — different phrasings of the same intent:
 - Uncommon use cases that still fall within the skill's domain
 - Cases where this skill competes with another but should win
 - Different levels of detail (brief request vs. detailed backstory)
-- Different languages if applicable (Russian + English)
+- Different languages if applicable (English + the user's own language)
 
 ### Should-NOT-Trigger Queries (8-10)
 
