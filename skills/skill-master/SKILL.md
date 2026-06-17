@@ -31,6 +31,23 @@ Codex-side `AGENTS.md` and `.codex/**` is generated runtime.
 ~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply
 ```
 
+**Built into framework skills — add it to your own.** Every skill in this framework that edits `.claude/**` already carries an autosync step: it writes the Claude-side source first, then regenerates the Codex runtime (and the `~/.claude` pre-commit hook runs the sync automatically when methodology files are staged). When you author your OWN skill that creates or edits `~/.claude/**` or project `.claude/**` files, paste this block near the top of its `SKILL.md` so your changes reach Codex too:
+
+````markdown
+## Autosync to Codex
+
+This skill edits Claude-side source of truth (`~/.claude/**` for global skills, or a project's `.claude/**`). Codex-side `~/.codex/**` / `AGENTS.md` is generated runtime. After editing those files, regenerate Codex:
+
+```bash
+~/.claude/scripts/sync-to-codex.sh --apply                   # global ~/.claude/**
+~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply  # project .claude/**
+```
+
+Commit the generated `.codex/**` / `AGENTS.md` changes together with the source. If sync reports a conflict, stop and report it.
+````
+
+If a skill never touches `.claude/**` (pure analysis, code-writing in a project's own source tree), it does not need an autosync block.
+
 ## About Skills
 
 Skills are modular, self-contained packages that extend Claude's capabilities by providing specialized knowledge, workflows, and tools. Think of them as "onboarding guides" for specific domains or tasks—they transform Claude from a general-purpose agent into a specialized agent equipped with procedural knowledge that no model can fully possess.
