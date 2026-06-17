@@ -152,6 +152,50 @@ Tasks can be code, user-action, deploy, config, or verification. Task nature is 
 
 ## Project Structure
 
+### Dual Runtime: Claude Source, Codex Generated
+
+The methodology is maintained in two compatible runtimes:
+
+```text
+Claude source of truth:
+~/.claude/                 # global methodology source
+{project}/CLAUDE.md        # project instructions source
+{project}/.claude/**       # project knowledge and project skills source
+
+Codex generated runtime:
+~/.codex/**                # generated global Codex runtime
+{project}/AGENTS.md        # generated project instructions
+{project}/.codex/**        # generated project Codex runtime
+```
+
+Rules:
+- Edit Claude files by default: `~/.claude/**`, `CLAUDE.md`, `.claude/**`.
+- Do not manually edit generated Codex files unless explicitly debugging sync behavior.
+- After changing global methodology files, run:
+
+```bash
+~/.claude/scripts/sync-to-codex.sh --apply
+```
+
+- After changing project docs or project skills, run:
+
+```bash
+~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply
+```
+
+- Project templates are dual-runtime. `/init-project` creates both Claude source files and Codex generated files.
+- `/init-project-knowledge`, `/done`, documentation-writing, project-planning, infrastructure-setup, deploy-pipeline, commands, and docs-related skills update `.claude/**` first, then sync to `.codex/**`.
+- Project pre-commit hooks run project sync automatically when staged `.claude/**` changes.
+- The global `~/.claude` pre-commit hook runs global sync automatically when staged methodology files change.
+
+MCP is handled separately because it is private runtime access, not documentation:
+
+```bash
+~/.claude/scripts/sync-mcp-to-codex.sh --apply --prune
+```
+
+This imports Claude/project `.mcp*.json` into local private Codex config (`~/.codex/mcp-imported/` and a managed block in `~/.codex/config.toml`). MCP configs, auth files, credentials, sessions, caches, and runtime state are never committed.
+
 ### Project Knowledge — the Knowledge Base
 
 All project documentation lives in `.claude/skills/project-knowledge/references/`. This is the single source of truth for everything about the project.

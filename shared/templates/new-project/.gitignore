@@ -13,6 +13,7 @@ secrets/
 
 # Local settings (not shared)
 .claude/settings.local.json
+.codex/settings.local.json
 
 # Dependencies
 node_modules/

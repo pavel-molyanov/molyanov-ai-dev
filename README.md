@@ -1,8 +1,47 @@
-# Claude Code Framework
+# AI-First Development Framework
 
-Фреймворк для AI-First разработки с [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+Фреймворк для AI-First разработки с [Claude Code](https://docs.anthropic.com/en/docs/claude-code) и [Codex](https://github.com/openai/codex). Единая методология, два совместимых runtime.
 
 В основе — spec-driven pipeline: сначала детально планируем работу через интервью с пользователем и исследование кодовой базы, согласуем спецификации, и только потом пишем код. Каждый этап проверяется специализированными агентами-валидаторами. Код пишется через TDD.
+
+## Два runtime: Claude и Codex
+
+Методология поддерживает оба агента сразу.
+
+- **Claude — источник истины.** Редактируются файлы в `~/.claude/`, `CLAUDE.md` и `.claude/**` проектов.
+- **Codex — сгенерированный runtime.** `~/.codex/`, `AGENTS.md` и `.codex/**` создаются из Claude-источников скриптом `scripts/sync-to-codex.py`. Вручную их не правят.
+
+Команды (`/new-user-spec`, `/do-task`, `/done` и т.д.), скиллы, агенты — те же самые. Меняется только интерпретатор.
+
+### Установка
+
+Скопируйте файлы фреймворка в свои runtime-папки:
+
+```bash
+# Claude (источник):
+mkdir -p ~/.claude
+cp -r skills agents commands shared hooks ~/.claude/
+
+# Codex (готовый снапшот):
+mkdir -p ~/.codex
+cp -r .codex/skills .codex/commands .codex/agents ~/.codex/
+
+# Либо положить скрипт и перегенерировать Codex из своих ~/.claude/**:
+mkdir -p ~/.claude/scripts
+cp scripts/sync-to-codex.py scripts/sync-to-codex.sh ~/.claude/scripts/
+~/.claude/scripts/sync-to-codex.sh --apply
+```
+
+### После любых правок методологии
+
+Если вы правите `~/.claude/**` локально — перегенерируйте Codex:
+
+```bash
+~/.claude/scripts/sync-to-codex.sh --apply                   # глобальные изменения
+~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply  # проектные .claude/**
+```
+
+Альтернатива без копирования скрипта: запустить из клона репозитория — `python3 scripts/sync-to-codex.py --apply`.
 
 ## Quick Start
 
@@ -272,10 +311,26 @@ work/{feature}/
 
 ---
 
+## Scripts и .codex — поддержка Codex runtime
+
+Папка `scripts/`:
+
+| Файл | Что делает |
+|---|---|
+| `sync-to-codex.py` + `sync-to-codex.sh` | Генерирует Codex-совместимые скиллы/команды/агенты и `AGENTS.md` из Claude-источников. CLI поддерживает `--dry-run`, `--apply`, `--project`. |
+| `sync-mcp-to-codex.py` + `sync-mcp-to-codex.sh` | Импортирует MCP-конфиги из `~/.claude/.mcp*.json` и проектов в локальный приватный Codex-конфиг (`~/.codex/mcp-imported/` и блок в `~/.codex/config.toml`). MCP-секреты в публичный репо не уходят. |
+
+Папка `.codex/` — pre-generated snapshot Codex runtime: `skills/`, `commands/`, `agents/`. Можно скопировать в `~/.codex/` как есть, или перегенерировать локально (см. раздел "Два runtime" выше).
+
+Подробнее про dual-runtime — скилл `methodology`.
+
+---
+
 ## Требования
 
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) и/или [Codex CLI](https://github.com/openai/codex) — фреймворк поддерживает оба runtime
 - [Context7 MCP сервер](https://github.com/upstash/context7) — агент использует его для получения актуальной документации библиотек вместо того, чтобы полагаться на данные из обучения
+- Python 3.10+ — нужен для `scripts/sync-to-codex.py`, если используется Codex runtime
 
 ---
 

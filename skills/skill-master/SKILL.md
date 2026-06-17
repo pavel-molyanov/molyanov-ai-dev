@@ -9,6 +9,28 @@ description: |
 
 # Skill Creator
 
+## Claude-to-Codex Autosync
+
+Global methodology source of truth is Claude-side: `~/.claude/**`.
+Codex-side `~/.codex/**` is generated runtime.
+
+When changing global methodology files under `~/.claude/skills/**`, `~/.claude/agents/**`, `~/.claude/commands/**`, or `~/.claude/shared/**`, immediately run:
+
+```bash
+~/.claude/scripts/sync-to-codex.sh --apply
+```
+
+If sync reports a conflict or validation error, stop and report it. Include generated `~/.codex/**` changes in the same commit as the `~/.claude/**` source change.
+
+When changing project-local `.claude/**` files inside a project, run project sync instead:
+
+Project source of truth is Claude-side: `CLAUDE.md` and `.claude/**`.
+Codex-side `AGENTS.md` and `.codex/**` is generated runtime.
+
+```bash
+~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply
+```
+
 ## About Skills
 
 Skills are modular, self-contained packages that extend Claude's capabilities by providing specialized knowledge, workflows, and tools. Think of them as "onboarding guides" for specific domains or tasks—they transform Claude from a general-purpose agent into a specialized agent equipped with procedural knowledge that no model can fully possess.
@@ -475,4 +497,3 @@ After creating or significantly updating a skill, suggest to the user to run ski
 
 **Functional (all skills):**
 - [ ] Run skill-checker and fix all issues
-

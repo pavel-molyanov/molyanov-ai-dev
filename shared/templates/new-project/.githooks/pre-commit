@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! git diff --cached --quiet -- .claude; then
+  REPO_ROOT="$(git rev-parse --show-toplevel)"
+  cd "$REPO_ROOT"
+
+  echo "Project docs changed in .claude/**; syncing generated Codex runtime..."
+  ~/.claude/scripts/sync-to-codex.sh --project "$REPO_ROOT" --apply
+
+  if [ -e "AGENTS.md" ]; then
+    git add -- AGENTS.md
+  fi
+
+  if [ -d ".codex" ]; then
+    git add -- .codex
+  fi
+fi

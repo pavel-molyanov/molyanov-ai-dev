@@ -16,6 +16,19 @@ Maintain project documentation in `.claude/skills/project-knowledge/references/`
 
 For creating documentation from scratch (new project or empty docs), use `project-planning` skill.
 
+## Project Documentation Autosync
+
+Project documentation source of truth is Claude-side: `CLAUDE.md` and `.claude/**`.
+Codex-side `AGENTS.md` and `.codex/**` are generated runtime files.
+
+After changing any project-local `.claude/**` file, immediately run:
+
+```bash
+~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply
+```
+
+If sync reports a conflict, stop and report it. Include generated `.codex/**` changes in the same commit as the `.claude/**` source change.
+
 ## Documentation Principles
 
 These rules apply to ALL documentation operations (audit, edit, create).

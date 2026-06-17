@@ -4,6 +4,7 @@ statsig/
 telemetry/
 .credentials.json
 .mcp.json
+.mcp.bot.json
 
 # User data (privacy)
 projects/

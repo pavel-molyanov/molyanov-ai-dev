@@ -14,6 +14,19 @@ description: |
 
 Conduct adaptive interview → make tech decisions → fill all project documentation in one session.
 
+## Project Documentation Autosync
+
+Project documentation source of truth is Claude-side: `CLAUDE.md` and `.claude/**`.
+Codex-side `AGENTS.md` and `.codex/**` are generated runtime files.
+
+After changing any project-local `.claude/**` file, immediately run:
+
+```bash
+~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply
+```
+
+If sync reports a conflict, stop and report it. Include generated `.codex/**` changes in the same commit as the `.claude/**` source change.
+
 ## Output Files
 
 **Project Knowledge** (`.claude/skills/project-knowledge/references/`):
