@@ -1,5 +1,5 @@
 ## Language
-- Artifacts addressed to the user (chat, plans, plan-mode, interviews, validator summaries, user-spec, README): the language the user writes in.
+- Artifacts addressed to the user (chat, plans, plan-mode, interviews, validator summaries, user-spec, README): the language the user writes in. Declare your language here — e.g. "This user writes in English." Skills and agents read the user's language from this line.
 - Technical docs, code, code comments, AI prompts, internal logs (tech-spec, tasks, AGENTS.md, skills): English.
 
 ## Behavior

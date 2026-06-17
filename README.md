@@ -8,6 +8,8 @@ At its core is a spec-driven pipeline: first we plan the work in detail through 
 
 The framework is multilingual: it talks to you, runs interviews, and writes user-facing specs in the language you write in, while keeping technical documents (tech-spec, tasks, code) in English.
 
+You set your language in one place — the instruction file: `~/.claude/CLAUDE.md` for Claude and `~/.codex/AGENTS.md` for Codex (or a project's `CLAUDE.md` / `AGENTS.md`). In the `## Language` section, declare your language, e.g. `This user writes in English.` Skills and agents read the language from there, so even subagents that never see the chat produce output in your language.
+
 ## Two runtimes: Claude and Codex
 
 The methodology supports both agents at once.
