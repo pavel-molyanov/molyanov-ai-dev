@@ -283,6 +283,11 @@ Agent uses Context7 MCP to fetch current library documentation instead of relyin
 ### Checkpoint Recovery
 Feature execution persists state to `checkpoint.yml` after each wave. A `SessionStart(compact)` hook detects context compaction during long feature executions and injects recovery context — the lead resumes from the next pending wave using checkpoint + decisions.md as source of truth.
 
+### Language
+User-facing artifacts (chat, plans, interviews, validator summaries, user-spec, README) are written in the language the user writes in. Technical artifacts (tech-spec, tasks, code, code comments, AI prompts, internal logs) and document section headers stay in English as stable anchors for validators.
+
+The user's language is declared once in the instruction file — `~/.claude/CLAUDE.md` for Claude and `~/.codex/AGENTS.md` for Codex (or per-project `CLAUDE.md` / `AGENTS.md`). Skills and agents resolve "the language the user writes in" from that declaration rather than guessing per message, so output stays consistent even for subagents that never see the chat. To change the language, edit only that one line.
+
 ---
 
 ## Skills Ecosystem
