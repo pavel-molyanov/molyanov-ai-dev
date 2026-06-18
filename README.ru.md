@@ -49,6 +49,23 @@ cp scripts/sync-to-codex.py scripts/sync-to-codex.sh ~/.claude/scripts/
 
 Альтернатива без копирования скрипта: запустить из клона репозитория — `python3 scripts/sync-to-codex.py --apply`.
 
+Собственные скиллы фреймворка делают это автоматически — каждый скилл, который правит `.claude/**`, сначала пишет Claude-side источник, а затем регенерирует Codex-рантайм. Если вы добавляете **свой** скилл, который создаёт или меняет файлы `.claude/**`, вставьте такой же блок автосинка в начало его `SKILL.md`, чтобы изменения попадали в оба рантайма:
+
+````markdown
+## Autosync to Codex
+
+This skill edits Claude-side source of truth (`~/.claude/**` for global skills, or a project's `.claude/**`). Codex-side `~/.codex/**` / `AGENTS.md` is generated runtime. After editing those files, regenerate Codex:
+
+```bash
+~/.claude/scripts/sync-to-codex.sh --apply                   # global ~/.claude/**
+~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply  # project .claude/**
+```
+
+Commit the generated `.codex/**` / `AGENTS.md` changes together with the source.
+````
+
+Если вы пользуетесь только Claude или только Codex — это можно пропустить: синк нужен лишь когда оба рантайма работают от одних источников.
+
 ## Quick Start
 
 **Новый проект:**

@@ -49,6 +49,23 @@ If you edit `~/.claude/**` locally — regenerate Codex:
 
 Alternative without copying the script: run it from a clone of the repo — `python3 scripts/sync-to-codex.py --apply`.
 
+The framework's own skills already do this automatically — every skill that edits `.claude/**` writes the Claude-side source first and then regenerates the Codex runtime. If you author **your own** skill that creates or edits `.claude/**` files, add the same autosync block near the top of its `SKILL.md` so changes propagate to both runtimes:
+
+````markdown
+## Autosync to Codex
+
+This skill edits Claude-side source of truth (`~/.claude/**` for global skills, or a project's `.claude/**`). Codex-side `~/.codex/**` / `AGENTS.md` is generated runtime. After editing those files, regenerate Codex:
+
+```bash
+~/.claude/scripts/sync-to-codex.sh --apply                   # global ~/.claude/**
+~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply  # project .claude/**
+```
+
+Commit the generated `.codex/**` / `AGENTS.md` changes together with the source.
+````
+
+If you use only Claude or only Codex, you can skip this — the sync only matters when you run both runtimes off the same sources.
+
 ## Quick Start
 
 **New project:**
