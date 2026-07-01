@@ -30,7 +30,7 @@ cp -r skills agents commands shared hooks ~/.claude/
 
 # Codex (готовый снапшот):
 mkdir -p ~/.codex
-cp -r .codex/skills .codex/commands .codex/agents ~/.codex/
+cp -r .codex/skills .codex/agents ~/.codex/
 
 # Либо положить скрипт и перегенерировать Codex из своих ~/.claude/**:
 mkdir -p ~/.claude/scripts
@@ -343,7 +343,7 @@ work/{feature}/
 | `sync-to-codex.py` + `sync-to-codex.sh` | Генерирует Codex-совместимые скиллы/команды/агенты и `AGENTS.md` из Claude-источников. CLI поддерживает `--dry-run`, `--apply`, `--project`. |
 | `sync-mcp-to-codex.py` + `sync-mcp-to-codex.sh` | Импортирует MCP-конфиги из `~/.claude/.mcp*.json` и проектов в локальный приватный Codex-конфиг (`~/.codex/mcp-imported/` и блок в `~/.codex/config.toml`). MCP-секреты в публичный репо не уходят. |
 
-Папка `.codex/` — pre-generated snapshot Codex runtime: `skills/`, `commands/`, `agents/`. Можно скопировать в `~/.codex/` как есть, или перегенерировать локально (см. раздел "Два runtime" выше).
+Папка `.codex/` — pre-generated snapshot Codex runtime: `skills/` (методологические скиллы плюс слэш-команды в виде скиллов `source-command-*`) и `agents/` (нативные Codex-сабагенты `*.toml`). Можно скопировать в `~/.codex/` как есть, или перегенерировать локально (см. раздел "Два runtime" выше).
 
 Подробнее про dual-runtime — скилл `methodology`.
 

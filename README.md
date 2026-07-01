@@ -30,7 +30,7 @@ cp -r skills agents commands shared hooks ~/.claude/
 
 # Codex (ready-made snapshot):
 mkdir -p ~/.codex
-cp -r .codex/skills .codex/commands .codex/agents ~/.codex/
+cp -r .codex/skills .codex/agents ~/.codex/
 
 # Or drop in the script and regenerate Codex from your own ~/.claude/**:
 mkdir -p ~/.claude/scripts
@@ -343,7 +343,7 @@ The `scripts/` folder:
 | `sync-to-codex.py` + `sync-to-codex.sh` | Generates Codex-compatible skills/commands/agents and `AGENTS.md` from the Claude sources. The CLI supports `--dry-run`, `--apply`, `--project`. |
 | `sync-mcp-to-codex.py` + `sync-mcp-to-codex.sh` | Imports MCP configs from `~/.claude/.mcp*.json` and projects into the local private Codex config (`~/.codex/mcp-imported/` and a block in `~/.codex/config.toml`). MCP secrets never go to the public repo. |
 
-The `.codex/` folder is a pre-generated snapshot of the Codex runtime: `skills/`, `commands/`, `agents/`. You can copy it into `~/.codex/` as-is, or regenerate it locally (see the "Two runtimes" section above).
+The `.codex/` folder is a pre-generated snapshot of the Codex runtime: `skills/` (methodology skills plus slash commands rendered as `source-command-*` skills) and `agents/` (native Codex `*.toml` subagents). You can copy it into `~/.codex/` as-is, or regenerate it locally (see the "Two runtimes" section above).
 
 More on the dual runtime — the `methodology` skill.
 
