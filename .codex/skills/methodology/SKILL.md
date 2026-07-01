@@ -293,7 +293,6 @@ The user's language is declared once in the instruction file — `~/.claude/CLAU
 
 ## Skills Ecosystem
 
-<!-- Exclude from methodology catalogs: items for private repo management (public-repo skill, public-repo-scanner agent, sync-public command). They are tooling for maintaining this repository, not part of the development methodology. -->
 
 ### Planning Skills
 | Skill | Purpose |

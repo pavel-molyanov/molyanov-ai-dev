@@ -12,6 +12,7 @@ import re
 import shutil
 import sys
 import tempfile
+import tomllib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -83,6 +84,7 @@ class PlanItem:
     mode: int = 0o644
     reason: str = ""
     manifest_source: Path | None = None
+    link_target: str | None = None
 
 
 @dataclass
@@ -152,13 +154,51 @@ def validate_slug(slug: str) -> None:
         raise ProtectedPathError(f"reserved generated path segment: {slug}")
 
 
-def reject_symlink(path: Path) -> None:
+def reject_symlink(path: Path, allow_leaf: bool = False) -> None:
     current = Path(path.anchor) if path.is_absolute() else Path(".")
     parts = path.parts[1:] if path.is_absolute() else path.parts
-    for part in parts:
+    last_index = len(parts) - 1
+    for index, part in enumerate(parts):
         current = current / part
+        if allow_leaf and index == last_index:
+            continue
         if current.exists() and current.is_symlink():
             raise ProtectedPathError(f"symlink rejected: {current}")
+
+
+def is_agent_toml_rel(rel: Path) -> bool:
+    """A managed agent .toml target where a mirrored symlink leaf is allowed."""
+    if rel.suffix != ".toml":
+        return False
+    return (len(rel.parts) == 2 and rel.parts[0] == "agents") or (
+        len(rel.parts) == 3 and rel.parts[:2] == (".codex", "agents")
+    )
+
+
+def is_command_skill_rel(rel: Path) -> bool:
+    """A managed source-command skill dir where a mirrored symlink leaf is allowed."""
+    leaf = rel.parts[-1] if rel.parts else ""
+    if not leaf.startswith("source-command-"):
+        return False
+    return (len(rel.parts) == 2 and rel.parts[0] == "skills") or (
+        len(rel.parts) == 3 and rel.parts[:2] == (".codex", "skills")
+    )
+
+
+def is_skill_dir_rel(rel: Path) -> bool:
+    """A skills/<name> dir where a mirrored (nested-project) symlink leaf is allowed.
+
+    Unlike command skills this matches any leaf name: shared skills live in
+    nested-project and the parent project symlinks them (single source of truth).
+    """
+    return (len(rel.parts) == 2 and rel.parts[0] == "skills") or (
+        len(rel.parts) == 3 and rel.parts[:2] == (".codex", "skills")
+    )
+
+
+def is_mirror_leaf_rel(rel: Path) -> bool:
+    """Whether a managed target may carry a mirrored (nested-project) symlink leaf."""
+    return is_agent_toml_rel(rel) or is_command_skill_rel(rel) or is_skill_dir_rel(rel)
 
 
 def read_text_source(path: Path, root: Path) -> str:
@@ -171,10 +211,30 @@ def read_text_source(path: Path, root: Path) -> str:
     return text
 
 
-def validate_target(path: Path, root: Path, allow_template_stale: bool = False) -> None:
-    safe_relative(path, root)
-    reject_symlink(path)
-    rel = path.resolve().relative_to(root)
+def lexical_relative(path: Path, root: Path) -> Path:
+    """Relative path computed without following a symlink leaf.
+
+    Resolves the parent directory only, so a managed symlink target (whose leaf
+    points outside root) is still classified by its logical location under root.
+    """
+    resolved_parent = path.parent.resolve()
+    try:
+        rel_parent = resolved_parent.relative_to(root.resolve())
+    except ValueError as exc:
+        raise ProtectedPathError(f"path outside allowed root: {path}") from exc
+    rel = rel_parent / path.name
+    if ".." in rel.parts:
+        raise ProtectedPathError(f"path traversal rejected: {path}")
+    return rel
+
+
+def validate_target(path: Path, root: Path, allow_template_stale: bool = False, symlink_leaf: bool = False) -> None:
+    if symlink_leaf:
+        rel = lexical_relative(path, root)
+    else:
+        safe_relative(path, root)
+        rel = path.resolve().relative_to(root)
+    reject_symlink(path, allow_leaf=symlink_leaf and is_mirror_leaf_rel(rel))
     allowed = (
         rel == Path("AGENTS.md")
         or rel.parts[:1] == ("skills",)
@@ -215,9 +275,12 @@ def validate_project_root(project_root: Path, allow_outside_root: bool = False) 
             raise ProtectedPathError(f"project root inside runtime directory rejected: {project_root}")
 
 
-def validate_project_target(path: Path, project_root: Path) -> None:
-    rel = safe_relative(path, project_root)
-    reject_symlink(path)
+def validate_project_target(path: Path, project_root: Path, symlink_leaf: bool = False) -> None:
+    if symlink_leaf:
+        rel = lexical_relative(path, project_root)
+    else:
+        rel = safe_relative(path, project_root)
+    reject_symlink(path, allow_leaf=symlink_leaf and is_mirror_leaf_rel(rel))
     allowed = (
         rel == Path("AGENTS.md")
         or rel.parts[:1] == (".codex",)
@@ -245,11 +308,11 @@ def lock_path(config: SyncConfig) -> Path:
     return config.codex_root / LOCK_REL
 
 
-def validate_any_target(path: Path, config: SyncConfig, allow_template_stale: bool = False) -> None:
+def validate_any_target(path: Path, config: SyncConfig, allow_template_stale: bool = False, symlink_leaf: bool = False) -> None:
     if config.project_root is not None:
-        validate_project_target(path, config.project_root)
+        validate_project_target(path, config.project_root, symlink_leaf=symlink_leaf)
     else:
-        validate_target(path, config.codex_root, allow_template_stale=allow_template_stale)
+        validate_target(path, config.codex_root, allow_template_stale=allow_template_stale, symlink_leaf=symlink_leaf)
 
 
 def add_header(content: str, source: Path, comment: str) -> str:
@@ -265,6 +328,9 @@ def add_header(content: str, source: Path, comment: str) -> str:
 
 def add_generated_header(content: str, comment: str) -> str:
     marker = f"Generated by sync-to-codex v{VERSION}. Do not edit directly."
+    if comment == "#":
+        line = f"# {marker}\n"
+        return content if content.startswith(line) else line + content
     line = f"{comment[0]} {marker} {comment[1]}\n" if len(comment) == 2 else f"{comment}{marker}\n"
     if content.startswith(line):
         return content
@@ -307,7 +373,15 @@ def adapt_tool_terms(text: str) -> str:
     return text
 
 
-def strip_frontmatter(text: str) -> tuple[dict[str, str], str]:
+def strip_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
+    """Parse a Markdown YAML frontmatter block.
+
+    Handles the subset of YAML our agent/skill/command files actually use:
+    - inline scalars (`key: value`),
+    - block scalars (`key: |` / `key: >`, value collected from indented lines),
+    - block sequences (`key:` then indented `- item` lines),
+    - inline comma scalars stay raw strings; callers normalize via frontmatter_list.
+    """
     if not text.startswith("---\n"):
         return {}, text
     end = text.find("\n---", 4)
@@ -316,18 +390,180 @@ def strip_frontmatter(text: str) -> tuple[dict[str, str], str]:
     raw = text[4:end].strip("\n")
     body_start = text.find("\n", end + 4)
     body = text[body_start + 1 :] if body_start != -1 else ""
-    meta: dict[str, str] = {}
-    current_key: str | None = None
-    for line in raw.splitlines():
+    meta: dict[str, str | list[str]] = {}
+    lines = raw.splitlines()
+    index = 0
+    total = len(lines)
+    while index < total:
+        line = lines[index]
         if not line.strip():
+            index += 1
             continue
-        if re.match(r"^[A-Za-z0-9_-]+:", line):
-            key, value = line.split(":", 1)
-            current_key = key.strip()
-            meta[current_key] = value.strip()
-        elif current_key:
-            meta[current_key] += "\n" + line
+        match = re.match(r"^([A-Za-z0-9_-]+):(.*)$", line)
+        if not match:
+            index += 1
+            continue
+        key = match.group(1).strip()
+        value = match.group(2).strip()
+        if value and value[0] in "|>":
+            index += 1
+            collected: list[str] = []
+            while index < total:
+                nxt = lines[index]
+                if nxt.strip() == "":
+                    collected.append("")
+                    index += 1
+                elif nxt[0] in " \t":
+                    collected.append(nxt.strip())
+                    index += 1
+                else:
+                    break
+            while collected and collected[-1] == "":
+                collected.pop()
+            meta[key] = "\n".join(collected)
+        elif value == "":
+            index += 1
+            items: list[str] = []
+            while index < total:
+                nxt = lines[index]
+                if nxt.strip() == "":
+                    index += 1
+                    continue
+                item_match = re.match(r"^\s+-\s+(.*)$", nxt)
+                if item_match:
+                    items.append(item_match.group(1).strip())
+                    index += 1
+                elif nxt[0] in " \t":
+                    # Indented but not a `- item`: nested mapping or unsupported
+                    # YAML. Fail loud rather than silently yield an empty list,
+                    # which could mis-map sandbox_mode/skills.
+                    raise SyncError(f"unsupported frontmatter under {key!r}: {nxt!r}")
+                else:
+                    break
+            meta[key] = items
+        else:
+            meta[key] = value
+            index += 1
     return meta, body
+
+
+def frontmatter_list(value: str | list[str] | None) -> list[str]:
+    """Normalize a frontmatter field to a list of tokens.
+
+    Accepts YAML block sequences (already a list) and inline comma strings
+    (`Read, Glob, Edit`), so allowed-tools/skills detection is format-agnostic.
+    """
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [token.strip() for token in value if token.strip()]
+    return [token.strip() for token in value.split(",") if token.strip()]
+
+
+TOML_AGENT_KEYS = ("name", "description", "developer_instructions", "sandbox_mode")
+WRITE_TOOLS = {"write", "edit", "multiedit", "bash", "notebookedit"}
+
+
+def toml_basic_string(value: str) -> str:
+    """Serialize a Python string as a single-line TOML basic string.
+
+    Single-line (newlines escaped as \\n) avoids the multi-line `\"\"\"` delimiter
+    edge cases entirely, so arbitrary agent bodies — including quotes, backslashes
+    and `sandbox_mode = "danger-full-access"`-looking text — cannot break out of the
+    string value. Round-trip validation in serialize_agent_toml is the safety net.
+    """
+    out: list[str] = []
+    for char in value:
+        code = ord(char)
+        if char == "\\":
+            out.append("\\\\")
+        elif char == '"':
+            out.append('\\"')
+        elif char == "\n":
+            out.append("\\n")
+        elif char == "\t":
+            out.append("\\t")
+        elif char == "\r":
+            out.append("\\r")
+        elif char == "\b":
+            out.append("\\b")
+        elif char == "\f":
+            out.append("\\f")
+        elif code < 0x20 or code == 0x7F:
+            out.append(f"\\u{code:04X}")
+        else:
+            out.append(char)
+    return '"' + "".join(out) + '"'
+
+
+def serialize_agent_toml(fields: dict[str, str]) -> str:
+    """Emit a Codex agent TOML from string fields, validating by round-trip parse.
+
+    Only keys from TOML_AGENT_KEYS are allowed (Codex uses deny_unknown_fields).
+    After serialization we parse it back with tomllib and assert keys and values
+    match exactly — any escaping defect or injected key fails loudly instead of
+    silently producing a malicious file.
+    """
+    unknown = set(fields) - set(TOML_AGENT_KEYS)
+    if unknown:
+        raise SyncError(f"unexpected agent TOML keys: {sorted(unknown)}")
+    lines = [f"{key} = {toml_basic_string(fields[key])}" for key in TOML_AGENT_KEYS if key in fields]
+    content = "\n".join(lines) + "\n"
+    parsed = tomllib.loads(content)
+    if set(parsed) != set(fields):
+        raise SyncError(f"agent TOML key mismatch after round-trip: {sorted(parsed)} != {sorted(fields)}")
+    for key, value in fields.items():
+        if parsed[key] != value:
+            raise SyncError(f"agent TOML round-trip mismatch for key {key!r}")
+    return content
+
+
+def sandbox_mode_for_tools(allowed_tools: list[str]) -> str:
+    """Map Claude allowed-tools to a Codex sandbox_mode.
+
+    Write-capable tools (Write/Edit/Bash/...) -> workspace-write. Anything else,
+    including an empty/missing list, defaults to the strictest read-only so a
+    missing field never silently grants write access.
+    """
+    for tool in allowed_tools:
+        if tool.strip().lower() in WRITE_TOOLS:
+            return "workspace-write"
+    return "read-only"
+
+
+def build_agent_toml(source: Path, source_root: Path) -> str | None:
+    """Generate a Codex agent .toml from a Claude agent .md, or None to skip.
+
+    Skips like the official migrator: missing name/description or empty body.
+    """
+    text = read_text_source(source, source_root)
+    meta, body = strip_frontmatter(text)
+    name = meta.get("name")
+    description = meta.get("description")
+    instructions = adapt_tool_terms(body).strip()
+    if not isinstance(name, str) or not name.strip():
+        return None
+    if not isinstance(description, str) or not description.strip():
+        return None
+    if not instructions:
+        return None
+    validate_slug(name.strip())
+    skills = frontmatter_list(meta.get("skills"))
+    if skills:
+        pointers = "\n".join(
+            f"- Before starting, load the methodology from `.codex/skills/{skill}/SKILL.md`."
+            for skill in skills
+        )
+        instructions = f"{instructions}\n\n## Required methodology\n\n{pointers}"
+    assert_no_operational_leftovers(instructions, source)
+    fields = {
+        "name": name.strip(),
+        "description": description.strip(),
+        "developer_instructions": instructions,
+        "sandbox_mode": sandbox_mode_for_tools(frontmatter_list(meta.get("allowed-tools"))),
+    }
+    content = serialize_agent_toml(fields)
+    return add_generated_header(content, "#")
 
 
 def validate_skill_frontmatter(content: str, source: Path) -> None:
@@ -426,28 +662,163 @@ def source_name(path: Path) -> str:
     return path.stem
 
 
-def adapt_agent_reference(source: Path, source_root: Path) -> str:
-    _, body = strip_frontmatter(read_text_source(source, source_root))
-    text = adapt_tool_terms(body).lstrip()
-    return add_generated_header(text, ("<!--", "-->"))
+def is_syncable_file(rel: Path) -> bool:
+    """Whether a skill/template file should be synced.
+
+    Compiled Python bytecode under `__pycache__` is regenerable build output, not
+    source, and is binary so it cannot be read as UTF-8 text. Skipping it keeps the
+    sync from crashing on projects whose skills ship helper scripts (e.g. SEO tools).
+    """
+    if "__pycache__" in rel.parts:
+        return False
+    return rel.suffix not in (".pyc", ".pyo")
 
 
-def adapt_agent_wrapper(source: Path, source_root: Path) -> str:
+def mirror_agent_link(link: str) -> str:
+    """Mirror a Claude agent symlink string into its Codex equivalent.
+
+    Rewrites each `.claude` path component to `.codex` and the `.md` leaf suffix
+    to `.toml`, preserving the relative shape (e.g.
+    `../../nested-project/.claude/agents/x.md` -> `../../nested-project/.codex/agents/x.toml`).
+    """
+    parts = link.split("/")
+    mirrored: list[str] = []
+    for index, part in enumerate(parts):
+        if part == ".claude":
+            mirrored.append(".codex")
+        elif index == len(parts) - 1 and part.endswith(".md"):
+            mirrored.append(part[:-3] + ".toml")
+        else:
+            mirrored.append(part)
+    return "/".join(mirrored)
+
+
+def mirror_skill_link(link: str) -> str:
+    """Mirror a Claude skill-dir symlink into its Codex equivalent.
+
+    Only rewrites `.claude` path components to `.codex`; the `skills/<name>` dir
+    shape is preserved (e.g. `../../nested-project/.claude/skills/task-manager`
+    -> `../../nested-project/.codex/skills/task-manager`).
+    """
+    return "/".join(".codex" if part == ".claude" else part for part in link.split("/"))
+
+
+def assert_mirror_source_shape(link: str, kind: str, *, leaf_is_dir: bool = False) -> None:
+    """Reject a symlink whose target is not a genuine Claude `kind` artifact.
+
+    Only `<ascent>.../<dirs>/.claude/<kind>/<name>`-shaped destinations are
+    mirrored. The check is *positional*, not membership-based: the final three
+    components must be exactly `.claude`, `<kind>`, `<name>`, and `..` is only
+    permitted as a contiguous leading prefix. Otherwise a link like
+    `../.claude/agents/../../secrets/x.md` (tokens present, but `..` re-escapes
+    into another in-root file) would slip past, letting Codex load an arbitrary
+    file as an agent/command definition. `leaf_is_dir` accepts a skill directory
+    leaf (`.claude/skills/<name>`) instead of an `.md` file leaf.
+    """
+    if link.startswith("/"):
+        raise ProtectedPathError(f"mirrored {kind} symlink must be relative: {link}")
+    parts = link.split("/")
+    seen_non_ascent = False
+    for part in parts:
+        if part == "..":
+            if seen_non_ascent:
+                raise ProtectedPathError(f"mirrored {kind} symlink has non-leading '..': {link}")
+            continue
+        if part in ("", "."):
+            raise ProtectedPathError(f"mirrored {kind} symlink has empty/'.' segment: {link}")
+        seen_non_ascent = True
+    tail = parts[-3:]
+    leaf_ok = bool(tail[2]) and not tail[2].endswith(".md") if leaf_is_dir else tail[2].endswith(".md")
+    if len(tail) != 3 or tail[0] != ".claude" or tail[1] != kind or not leaf_ok:
+        suffix = "<name>" if leaf_is_dir else "<name>.md"
+        raise ProtectedPathError(f"mirrored {kind} symlink must end .claude/{kind}/{suffix}: {link}")
+
+
+def assert_mirror_link_contained(target: Path, link: str, root: Path) -> None:
+    """Reject a mirrored symlink whose destination lexically escapes the sync root.
+
+    Purely lexical (no resolve), so a still-uncreated nested-project target is fine,
+    while an absolute or `../`-escaping link that could point Codex at a file
+    outside the repo is rejected — parity with the old containment guard.
+    """
+    destination = Path(os.path.normpath(os.path.join(str(target.parent), link)))
+    try:
+        destination.relative_to(root.resolve())
+    except ValueError as exc:
+        raise ProtectedPathError(f"mirrored symlink escapes root: {target} -> {link}") from exc
+    # When the destination already exists, an intermediate directory in the link
+    # could itself be a symlink pointing outside root; the lexical check above
+    # cannot see that, so confirm the real path stays contained.
+    if destination.exists():
+        real = Path(os.path.realpath(destination))
+        try:
+            real.relative_to(root.resolve())
+        except ValueError as exc:
+            raise ProtectedPathError(f"mirrored symlink resolves outside root: {target} -> {link}") from exc
+
+
+def classify_symlink(target: Path, link_target: str, manifest_links: dict[str, str]) -> str:
+    """Classify a managed symlink without ever resolving its (possibly dangling) target."""
+    if not target.is_symlink():
+        if target.exists():
+            return "conflict target edited"
+        return "create"
+    current = os.readlink(target)
+    if current == link_target:
+        return "skip unchanged"
+    previous = manifest_links.get(str(target))
+    if previous is not None and current == previous:
+        return "update"
+    return "conflict target edited"
+
+
+def make_agent_item(
+    source: Path,
+    read_root: Path,
+    target_dir: Path,
+    adapter: str,
+    config: SyncConfig,
+    manifest_targets: dict[str, str],
+    manifest_links: dict[str, str],
+) -> PlanItem | None:
+    """Build a plan item for one Claude agent source.
+
+    Real files become a generated `.toml`; symlinks are mirrored as symlinks so
+    the single-source-of-truth layout (nested-project) is preserved in Codex too.
+    Returns None when the agent has no name/description/body (skipped like the
+    official migrator), or when the slug collides with config.toml.
+    """
     name = source_name(source)
-    _, body = strip_frontmatter(read_text_source(source, source_root))
-    body = adapt_tool_terms(body).lstrip()
-    content = (
-        "---\n"
-        f"name: claude-agent-{name}\n"
-        f"description: Converted Codex role prompt from Claude agent `{name}`. Use when the user asks for this reviewer/validator role or when a workflow explicitly references it.\n"
-        "---\n\n"
-        f"# Converted Role: {name}\n\n"
-        f"Generated from `{source}`.\n"
-        "Codex does not have native Claude custom agent types. Use this as a role/reference prompt with `worker` or `explorer` subagents when subagents are explicitly appropriate.\n\n"
-        f"{body}"
+    if name == "config":
+        return None
+    target = target_dir / f"{name}.toml"
+    if source.is_symlink():
+        raw_link = os.readlink(source)
+        assert_mirror_source_shape(raw_link, "agents")
+        link = mirror_agent_link(raw_link)
+        assert_mirror_link_contained(target, link, sync_root(config))
+        validate_any_target(target, config, symlink_leaf=True)
+        return PlanItem(
+            action=classify_symlink(target, link, manifest_links),
+            source=source,
+            target=target,
+            adapter=adapter,
+            content=None,
+            link_target=link,
+            manifest_source=source,
+        )
+    content = build_agent_toml(source, read_root)
+    if content is None:
+        return None
+    validate_any_target(target, config)
+    return PlanItem(
+        action=classify_managed_write(target, content, manifest_targets),
+        source=source,
+        target=target,
+        adapter=adapter,
+        content=content,
+        manifest_source=source,
     )
-    assert_no_operational_leftovers(content, source)
-    return content
 
 
 def inject_init_project_asserts(text: str) -> str:
@@ -506,21 +877,124 @@ def adapt_command_body(source: Path, source_root: Path) -> str:
     return body
 
 
-def adapt_command_wrapper(source: Path, source_root: Path) -> str:
+def command_skill_slug(name: str) -> str:
+    """Codex skill slug for a Claude command, matching the official migrator prefix."""
+    slug = f"source-command-{name}"[:64]
+    validate_slug(slug)
+    return slug
+
+
+def build_command_skill(source: Path, source_root: Path) -> tuple[str, str]:
+    """Return (slug, SKILL.md content) for a Claude command rendered as a Codex skill."""
     name = source_name(source)
+    slug = command_skill_slug(name)
     body = adapt_command_body(source, source_root)
     content = (
         "---\n"
-        f"name: claude-command-{name}\n"
+        f"name: {slug}\n"
         f"description: Converted Codex workflow from Claude slash command `{name}`. Use when the user asks to run the equivalent command or describes this workflow.\n"
         "---\n\n"
-        f"# Converted Command Workflow: {name}\n\n"
-        f"Generated from `{source}`.\n"
+        f"# Command Workflow: {name}\n\n"
         "Treat Claude-only tool names as conceptual workflow steps and use available Codex tools/policies.\n\n"
         f"{body}"
     )
+    content = add_generated_header(content, ("<!--", "-->"))
     assert_no_operational_leftovers(content, source)
-    return content
+    return slug, content
+
+
+def make_command_item(
+    source: Path,
+    read_root: Path,
+    skills_dir: Path,
+    adapter: str,
+    config: SyncConfig,
+    manifest_targets: dict[str, str],
+    manifest_links: dict[str, str],
+) -> PlanItem | None:
+    """Build a plan item for one Claude command as a Codex source-command skill.
+
+    Symlinked command sources are mirrored as symlinks (parity with agents);
+    real files generate the SKILL.md. config-named commands are skipped.
+    """
+    name = source_name(source)
+    if name == "config":
+        return None
+    slug = command_skill_slug(name)
+    if source.is_symlink():
+        target = skills_dir / slug
+        raw_link = os.readlink(source)
+        assert_mirror_source_shape(raw_link, "commands")
+        link = mirror_command_link(raw_link, slug)
+        assert_mirror_link_contained(target, link, sync_root(config))
+        validate_any_target(target, config, symlink_leaf=True)
+        return PlanItem(
+            action=classify_symlink(target, link, manifest_links),
+            source=source,
+            target=target,
+            adapter=adapter,
+            content=None,
+            link_target=link,
+            manifest_source=source,
+        )
+    slug, content = build_command_skill(source, read_root)
+    target = skills_dir / slug / "SKILL.md"
+    validate_any_target(target, config)
+    return PlanItem(
+        action=classify_managed_write(target, content, manifest_targets),
+        source=source,
+        target=target,
+        adapter=adapter,
+        content=content,
+        manifest_source=source,
+    )
+
+
+def mirror_command_link(link: str, slug: str) -> str:
+    """Mirror a Claude command symlink into a Codex source-command skill-dir symlink."""
+    parts = link.split("/")
+    mirrored: list[str] = []
+    for index, part in enumerate(parts):
+        if part == ".claude":
+            mirrored.append(".codex")
+        elif part == "commands":
+            mirrored.append("skills")
+        elif index == len(parts) - 1 and part.endswith(".md"):
+            mirrored.append(slug)
+        else:
+            mirrored.append(part)
+    return "/".join(mirrored)
+
+
+def make_skill_symlink_item(
+    source: Path,
+    skills_dir: Path,
+    adapter: str,
+    config: SyncConfig,
+    manifest_links: dict[str, str],
+) -> PlanItem:
+    """Mirror a symlinked skill directory (shared from nested-project) as a symlink.
+
+    Keeps the single-source-of-truth layout in Codex too: the parent project
+    points at nested-project's `.codex/skills/<name>` rather than duplicating files.
+    """
+    name = source.name
+    validate_slug(name)
+    target = skills_dir / name
+    raw_link = os.readlink(source)
+    assert_mirror_source_shape(raw_link, "skills", leaf_is_dir=True)
+    link = mirror_skill_link(raw_link)
+    assert_mirror_link_contained(target, link, sync_root(config))
+    validate_any_target(target, config, symlink_leaf=True)
+    return PlanItem(
+        action=classify_symlink(target, link, manifest_links),
+        source=source,
+        target=target,
+        adapter=adapter,
+        content=None,
+        link_target=link,
+        manifest_source=source,
+    )
 
 
 def build_template_items(config: SyncConfig) -> list[PlanItem]:
@@ -531,6 +1005,8 @@ def build_template_items(config: SyncConfig) -> list[PlanItem]:
     items: list[PlanItem] = []
     for source in sorted(path for path in source_root.rglob("*") if path.is_file()):
         source_rel = source.relative_to(source_root)
+        if not is_syncable_file(source_rel):
+            continue
         if source_rel.parts[:1] == (".claude",) and source.name.startswith("settings") and source.suffix == ".json":
             continue
         source_content = read_text_source(source, config.claude_root)
@@ -583,6 +1059,8 @@ def build_skill_items(config: SyncConfig) -> list[PlanItem]:
                 skill_names.add(meta["name"])
         for source in sorted(path for path in skill_dir.rglob("*") if path.is_file()):
             source_rel = source.relative_to(source_root)
+            if not is_syncable_file(source_rel):
+                continue
             target = target_root / source_rel
             content = adapt_skill_file(source, config.claude_root)
             validate_target(target, config.codex_root)
@@ -590,56 +1068,37 @@ def build_skill_items(config: SyncConfig) -> list[PlanItem]:
     return items
 
 
-def build_agent_items(config: SyncConfig) -> list[PlanItem]:
+def build_agent_items(
+    config: SyncConfig,
+    manifest_targets: dict[str, str],
+    manifest_links: dict[str, str],
+) -> list[PlanItem]:
     source_root = config.claude_root / "agents"
     if not source_root.is_dir():
         return []
+    target_dir = config.codex_root / "agents"
     items: list[PlanItem] = []
     for source in sorted(source_root.glob("*.md")):
-        name = source_name(source)
-        ref_target = config.codex_root / "agents" / f"{name}.md"
-        ref_content = adapt_agent_reference(source, config.claude_root)
-        wrapper_target = config.codex_root / "skills" / f"claude-agent-{name}" / "SKILL.md"
-        wrapper_content = adapt_agent_wrapper(source, config.claude_root)
-        for target, content in ((ref_target, ref_content), (wrapper_target, wrapper_content)):
-            validate_target(target, config.codex_root)
-            items.append(
-                PlanItem(
-                    action=classify_write(target, content),
-                    source=source,
-                    target=target,
-                    adapter="agent",
-                    content=content,
-                    manifest_source=source,
-                )
-            )
+        item = make_agent_item(source, config.claude_root, target_dir, "agent", config, manifest_targets, manifest_links)
+        if item is not None:
+            items.append(item)
     return items
 
 
-def build_command_items(config: SyncConfig) -> list[PlanItem]:
+def build_command_items(
+    config: SyncConfig,
+    manifest_targets: dict[str, str],
+    manifest_links: dict[str, str],
+) -> list[PlanItem]:
     source_root = config.claude_root / "commands"
     if not source_root.is_dir():
         return []
+    skills_dir = config.codex_root / "skills"
     items: list[PlanItem] = []
     for source in sorted(source_root.glob("*.md")):
-        name = source_name(source)
-        ref_target = config.codex_root / "commands" / f"{name}.md"
-        ref_body = adapt_command_body(source, config.claude_root)
-        ref_content = add_generated_header(ref_body, ("<!--", "-->"))
-        wrapper_target = config.codex_root / "skills" / f"claude-command-{name}" / "SKILL.md"
-        wrapper_content = adapt_command_wrapper(source, config.claude_root)
-        for target, content in ((ref_target, ref_content), (wrapper_target, wrapper_content)):
-            validate_target(target, config.codex_root)
-            items.append(
-                PlanItem(
-                    action=classify_write(target, content),
-                    source=source,
-                    target=target,
-                    adapter="command",
-                    content=content,
-                    manifest_source=source,
-                )
-            )
+        item = make_command_item(source, config.claude_root, skills_dir, "command", config, manifest_targets, manifest_links)
+        if item is not None:
+            items.append(item)
     return items
 
 
@@ -651,22 +1110,46 @@ def classify_write(target: Path, content: str) -> str:
     return "update"
 
 
-def build_stale_items(config: SyncConfig, prune: bool) -> list[PlanItem]:
-    template_root = config.codex_root / TEMPLATE_REL
+STALE_GLOBS = ("skills/claude-agent-*", "skills/claude-command-*", "agents/*.md", "commands/*")
+
+
+def build_stale_items(base: Path, prune: bool, reason: str) -> list[PlanItem]:
+    """Collect legacy wrapper artifacts under a Codex base dir for pruning.
+
+    Old layout used `skills/claude-agent-*`, `skills/claude-command-*`,
+    markdown `agents/*.md` references, and a dead `commands/*` mirror; the new
+    layout emits `agents/*.toml` and `skills/source-command-*` instead.
+    """
     stale_paths: list[Path] = []
-    stale_settings = template_root / ".claude" / "settings.json"
-    if stale_settings.exists():
-        stale_paths.append(stale_settings)
+    for pattern in STALE_GLOBS:
+        for path in sorted(base.glob(pattern)):
+            stale_paths.append(path)
     action = "delete" if prune else "stale managed"
-    return [PlanItem(action=action, source=None, target=path, adapter="new-project-template", reason="Claude-shaped template leftover") for path in stale_paths]
+    return [
+        PlanItem(action=action, source=None, target=path, adapter="stale", reason=reason)
+        for path in stale_paths
+    ]
 
 
-def build_project_items(config: SyncConfig) -> list[PlanItem]:
+def build_template_stale_items(config: SyncConfig, prune: bool) -> list[PlanItem]:
+    template_root = config.codex_root / TEMPLATE_REL
+    stale_settings = template_root / ".claude" / "settings.json"
+    if not stale_settings.exists():
+        return []
+    action = "delete" if prune else "stale managed"
+    return [PlanItem(action=action, source=None, target=stale_settings, adapter="new-project-template", reason="Claude-shaped template leftover")]
+
+
+def build_project_items(
+    config: SyncConfig,
+    manifest_targets: dict[str, str],
+    manifest_links: dict[str, str],
+    prune: bool,
+) -> list[PlanItem]:
     if config.project_root is None:
         return []
     project = config.project_root
     validate_project_root(project, config.allow_project_outside_root)
-    manifest_targets = manifest_target_hashes(config)
     items: list[PlanItem] = []
     claude_md = project / "CLAUDE.md"
     if claude_md.exists():
@@ -684,22 +1167,51 @@ def build_project_items(config: SyncConfig) -> list[PlanItem]:
         )
     skills_root = project / ".claude" / "skills"
     if skills_root.exists():
-        for source in sorted(path for path in skills_root.rglob("*") if path.is_file()):
-            source_rel = source.relative_to(skills_root)
-            if source.name.startswith("settings") and source.suffix == ".json":
-                continue
-            content = adapt_skill_file(source, project)
-            target = project / ".codex" / "skills" / source_rel
-            validate_project_target(target, project)
-            items.append(
-                PlanItem(
-                    action=classify_managed_write(target, content, manifest_targets),
-                    source=source,
-                    target=target,
-                    adapter="project-skill",
-                    content=content,
+        codex_skills_dir = project / ".codex" / "skills"
+        for child in sorted(skills_root.iterdir()):
+            # A skill dir that is itself a symlink (shared from nested-project) is
+            # mirrored as a symlink, never walked/copied file-by-file.
+            if child.is_symlink():
+                items.append(
+                    make_skill_symlink_item(child, codex_skills_dir, "project-skill", config, manifest_links)
                 )
+                continue
+            file_sources = sorted(p for p in child.rglob("*") if p.is_file()) if child.is_dir() else [child]
+            for source in file_sources:
+                source_rel = source.relative_to(skills_root)
+                if not is_syncable_file(source_rel):
+                    continue
+                if source.name.startswith("settings") and source.suffix == ".json":
+                    continue
+                content = adapt_skill_file(source, project)
+                target = codex_skills_dir / source_rel
+                validate_project_target(target, project)
+                items.append(
+                    PlanItem(
+                        action=classify_managed_write(target, content, manifest_targets),
+                        source=source,
+                        target=target,
+                        adapter="project-skill",
+                        content=content,
+                    )
+                )
+    agents_dir = project / ".claude" / "agents"
+    if agents_dir.is_dir():
+        for source in sorted(agents_dir.glob("*.md")):
+            item = make_agent_item(
+                source, project, project / ".codex" / "agents", "project-agent", config, manifest_targets, manifest_links
             )
+            if item is not None:
+                items.append(item)
+    commands_dir = project / ".claude" / "commands"
+    if commands_dir.is_dir():
+        for source in sorted(commands_dir.glob("*.md")):
+            item = make_command_item(
+                source, project, project / ".codex" / "skills", "project-command", config, manifest_targets, manifest_links
+            )
+            if item is not None:
+                items.append(item)
+    items.extend(build_stale_items(project / ".codex", prune, "Claude-shaped Codex wrapper leftover"))
     return items
 
 
@@ -715,6 +1227,19 @@ def manifest_target_hashes(config: SyncConfig) -> dict[str, str]:
     return hashes
 
 
+def manifest_target_links(config: SyncConfig) -> dict[str, str]:
+    """Map of managed-symlink target -> recorded link string (lexical key, never resolved)."""
+    manifest = load_manifest(config)
+    links: dict[str, str] = {}
+    for entry in manifest.get("entries", []):
+        for output in entry.get("outputs", []):
+            target = output.get("target")
+            link_target = output.get("link_target")
+            if target and link_target:
+                links[str(target)] = link_target
+    return links
+
+
 def classify_managed_write(target: Path, content: str, manifest_targets: dict[str, str]) -> str:
     if not target.exists():
         return "create"
@@ -728,28 +1253,55 @@ def classify_managed_write(target: Path, content: str, manifest_targets: dict[st
 
 
 def build_plan(config: SyncConfig, prune: bool) -> SyncPlan:
+    manifest_targets = manifest_target_hashes(config)
+    manifest_links = manifest_target_links(config)
     if config.project_root is not None:
-        items = build_project_items(config)
+        items = build_project_items(config, manifest_targets, manifest_links, prune)
         for item in items:
-            validate_any_target(item.target, config)
+            validate_any_target(item.target, config, symlink_leaf=item.link_target is not None)
             if item.content and contains_secret_like_content(item.content):
                 raise ProtectedPathError(f"secret-looking output rejected: {item.target}")
         return SyncPlan(items=items)
     items = build_template_items(config)
     items.append(build_script_item(config))
     items.extend(build_skill_items(config))
-    items.extend(build_agent_items(config))
-    items.extend(build_command_items(config))
-    items.extend(build_stale_items(config, prune))
+    items.extend(build_agent_items(config, manifest_targets, manifest_links))
+    items.extend(build_command_items(config, manifest_targets, manifest_links))
+    items.extend(build_template_stale_items(config, prune))
+    items.extend(build_stale_items(config.codex_root, prune, "Claude-shaped Codex wrapper leftover"))
     for item in items:
-        validate_any_target(item.target, config, allow_template_stale=item.action in {"delete", "stale managed"})
+        validate_any_target(
+            item.target,
+            config,
+            allow_template_stale=item.action in {"delete", "stale managed"},
+            symlink_leaf=item.link_target is not None,
+        )
         if item.content and contains_secret_like_content(item.content):
             raise ProtectedPathError(f"secret-looking output rejected: {item.target}")
     return SyncPlan(items=items)
 
 
+def manifest_output(item: PlanItem, source_text: str) -> dict:
+    if item.link_target is not None:
+        # Lexical target (never resolve a symlink leaf) + recorded link string.
+        return {
+            "target": str(item.target),
+            "source_sha256": sha256_text(source_text),
+            "link_target": item.link_target,
+            "sync_owned": True,
+        }
+    return {
+        "target": str(item.target.resolve()),
+        "source_sha256": sha256_text(source_text),
+        "output_sha256": sha256_text(item.content or ""),
+        "sync_owned": True,
+    }
+
+
 def manifest_entry(source: Path, adapter: str, items: list[PlanItem]) -> dict:
-    source_text = source.read_text(encoding="utf-8")
+    # A mirrored symlink source may point at a directory (shared skill); hash the
+    # link string, which is what actually determines the mirrored output.
+    source_text = os.readlink(source) if source.is_symlink() else source.read_text(encoding="utf-8")
     return {
         "source": str(source.resolve()),
         "adapter": adapter,
@@ -757,12 +1309,7 @@ def manifest_entry(source: Path, adapter: str, items: list[PlanItem]) -> dict:
         "transformer_version": VERSION,
         "input_set_hash": sha256_text(source_text),
         "outputs": [
-            {
-                "target": str(item.target.resolve()),
-                "source_sha256": sha256_text(source_text),
-                "output_sha256": sha256_text(item.content or ""),
-                "sync_owned": True,
-            }
+            manifest_output(item, source_text)
             for item in sorted(items, key=lambda planned: str(planned.target))
         ],
         "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
@@ -772,7 +1319,9 @@ def manifest_entry(source: Path, adapter: str, items: list[PlanItem]) -> dict:
 def manifest_groups(plan: SyncPlan) -> dict[tuple[str, str], tuple[Path, str, list[PlanItem]]]:
     groups: dict[tuple[str, str], tuple[Path, str, list[PlanItem]]] = {}
     for item in plan.items:
-        if item.action not in {"create", "update", "skip unchanged"} or not item.source or item.content is None:
+        if item.action not in {"create", "update", "skip unchanged"} or not item.source:
+            continue
+        if item.content is None and item.link_target is None:
             continue
         source = item.manifest_source or item.source
         key = (str(source.resolve()), item.adapter)
@@ -791,14 +1340,19 @@ def load_manifest(config: SyncConfig) -> dict:
 
 def write_manifest(config: SyncConfig, plan: SyncPlan) -> None:
     existing = load_manifest(config)
-    by_key = {(entry["source"], entry["adapter"]): entry for entry in existing.get("entries", [])}
+    old_by_key = {(entry["source"], entry["adapter"]): entry for entry in existing.get("entries", [])}
+    new_by_key: dict[tuple[str, str], dict] = {}
+    # Rebuild from the current plan only, so entries for sources that no longer
+    # exist are garbage-collected. Preserve the prior entry (and timestamp) when
+    # outputs are unchanged to keep repeated syncs idempotent.
     for key, (source, adapter, grouped_items) in manifest_groups(plan).items():
         entry = manifest_entry(source, adapter, grouped_items)
-        old_entry = by_key.get(key)
+        old_entry = old_by_key.get(key)
         if old_entry and old_entry.get("outputs") == entry.get("outputs"):
-            continue
-        by_key[key] = entry
-    manifest = {"version": VERSION, "entries": list(by_key.values())}
+            new_by_key[key] = old_entry
+        else:
+            new_by_key[key] = entry
+    manifest = {"version": VERSION, "entries": list(new_by_key.values())}
     path = manifest_path(config)
     validate_any_target(path, config)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -824,6 +1378,23 @@ def atomic_write_text(path: Path, content: str, mode: int) -> None:
             os.unlink(tmp_name)
 
 
+def write_symlink(target: Path, link_target: str) -> None:
+    """Atomically create/replace a symlink leaf with the given (unresolved) link string."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.parent / f".{target.name}.{os.getpid()}.tmp"
+    if tmp.is_symlink() or tmp.exists():
+        tmp.unlink()
+    os.symlink(link_target, tmp)
+    os.replace(tmp, target)
+
+
+def remove_target(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+
+
 def acquire_lock(config: SyncConfig) -> Path:
     lock = lock_path(config)
     validate_any_target(lock, config)
@@ -841,15 +1412,19 @@ def apply_plan(config: SyncConfig, plan: SyncPlan) -> None:
         paths = ", ".join(str(item.target) for item in conflicts)
         raise ConflictError(f"conflicts detected; refusing to apply: {paths}")
     lock = acquire_lock(config)
+    stop = sync_root(config)
     try:
         for item in plan.items:
             if item.action in {"create", "update"}:
-                assert item.content is not None
-                atomic_write_text(item.target, item.content, item.mode)
+                if item.link_target is not None:
+                    write_symlink(item.target, item.link_target)
+                else:
+                    assert item.content is not None
+                    atomic_write_text(item.target, item.content, item.mode)
             elif item.action == "delete":
-                if item.target.exists():
-                    item.target.unlink()
-                    cleanup_empty_dirs(item.target.parent, config.codex_root / TEMPLATE_REL)
+                if item.target.is_symlink() or item.target.exists():
+                    remove_target(item.target)
+                    cleanup_empty_dirs(item.target.parent, stop)
         write_manifest(config, plan)
     finally:
         lock.unlink(missing_ok=True)
