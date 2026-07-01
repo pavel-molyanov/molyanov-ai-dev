@@ -1395,15 +1395,60 @@ def remove_target(path: Path) -> None:
         shutil.rmtree(path)
 
 
+def _process_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def lock_is_stale(lock: Path) -> bool:
+    """Whether a held lock was abandoned by a crashed run.
+
+    Stale when the recorded holder PID is missing, unreadable, non-numeric, or
+    belongs to a process that is no longer alive. Errs toward "held" on an
+    unexpected read failure, so a live lock is never reclaimed by mistake.
+    """
+    try:
+        raw = lock.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+    if not raw:
+        return True
+    try:
+        pid = int(raw.splitlines()[0])
+    except ValueError:
+        return True
+    if pid == os.getpid():
+        return True
+    return not _process_alive(pid)
+
+
 def acquire_lock(config: SyncConfig) -> Path:
     lock = lock_path(config)
     validate_any_target(lock, config)
     lock.parent.mkdir(parents=True, exist_ok=True)
     lock.parent.chmod(0o700)
-    fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        handle.write(f"{os.getpid()}\n")
-    return lock
+    for attempt in range(2):
+        try:
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            if attempt == 0 and lock_is_stale(lock):
+                lock.unlink(missing_ok=True)
+                continue
+            raise SyncError(
+                f"another sync is already running (lock held: {lock}); "
+                "remove it manually only if no sync-to-codex process is alive"
+            )
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(f"{os.getpid()}\n")
+        return lock
+    raise SyncError(f"could not acquire sync lock: {lock}")
 
 
 def apply_plan(config: SyncConfig, plan: SyncPlan) -> None:

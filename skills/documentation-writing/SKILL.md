@@ -29,6 +29,22 @@ After changing any project-local `.claude/**` file, immediately run:
 
 If sync reports a conflict, stop and report it. Include generated `.codex/**` changes in the same commit as the `.claude/**` source change.
 
+### Nested Agent Workspaces
+
+Some projects keep an agent workspace under a subdirectory (for example
+`nested-workspace/.claude/**`) while the repository root exposes selected skills or
+agents through symlinks in root `.claude/**`. In that case, sync both levels:
+
+```bash
+~/.claude/scripts/sync-to-codex.sh --project "$PWD/nested-workspace" --apply
+~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply
+```
+
+Verify root `.codex/agents` / `.codex/skills` and
+`.codex/.sync/claude-to-codex-manifest.json` include every root-exposed agent or
+skill. A generated file existing only inside the nested workspace is not enough
+when the root runtime must invoke it.
+
 ## Documentation Principles
 
 These rules apply to ALL documentation operations (audit, edit, create).
