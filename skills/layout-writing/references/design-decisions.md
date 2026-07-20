@@ -1,28 +1,54 @@
 # Design Decisions from Existing Evidence
 
-Use this reference only for details the supplied source does not define. The skill reproduces and extends a design language; it does not create a new visual identity.
+Use this reference only when no exact source exists or for states, widths, and parts that a partial source does not define. It helps continue a project's visual language; it does not authorize a new brand or override intentional source values.
 
 ## Evidence Order
 
-Choose unspecified values from the nearest reliable evidence:
+Choose an unspecified value from the nearest reliable evidence:
 
-1. The exact source frame or state for the element.
+1. Project documentation and explicit repository rules.
 2. The same component in another supplied viewport or state.
-3. Neighboring components on the same page.
+3. Neighboring components and nearby pages.
 4. Project tokens and established shared components.
-5. General interface conventions.
+5. General interface conventions below.
 
-This order prevents an arbitrary global convention from overriding the visual grammar immediately surrounding the element.
+## Spacing and Grid
 
-## Coherent Extension
+- Use consistent gaps for repeated cards, fields, and controls.
+- Align headings, copy, cards, and sections to shared container edges and the project's existing grid.
+- Choose new spacing from the project's scale; an odd value such as `13px` is acceptable when a source, token, or repeated local pattern explains it.
+- Preserve useful edge padding and whitespace that groups related content.
+- Keep column proportions workable at intermediate and mobile widths.
 
-When adding a new block in the existing style, map its roles before choosing values:
+## Typography
 
-- outer container and alignment grid;
-- heading, body, label, and action typography roles;
-- surface, border, text, accent, and muted color roles;
-- standard spacing steps, corner radius, shadows, and control heights;
-- mobile stacking and content priority;
-- interaction and motion patterns already used nearby.
+- Continue the project's hierarchy for headings, body text, labels, and supporting copy, including its families, sizes, weights, and line heights.
+- Keep lines readable and wrapping intentional; test real long content for clipping or container overflow.
+- Use `ellipsis` only when the component's intended behavior permits truncation.
 
-Prefer existing tokens and variants that satisfy the role. If no suitable variant exists, introduce the smallest local value or variant that fits the surrounding pattern.
+## Color, Background, and Visual Hierarchy
+
+- Use established colors and variables, with legible text, borders, and controls on their actual backgrounds.
+- Group related elements visually and keep the primary action more prominent than secondary actions.
+- Make empty space part of the structure rather than an unexplained gap.
+- Follow existing project rules for statuses and themes when they are in scope.
+
+## Component Consistency
+
+- Reuse a suitable component or token before adding a local equivalent.
+- Keep buttons, cards, fields, tabs, and labels with the same purpose visually and behaviorally consistent.
+- Match the project's icon style and optical sizing, radii, shadows, borders, and line weights.
+
+## Interactive States
+
+- Check the applicable `hover`, `focus`, `active`, and `disabled` states of affected elements.
+- Keep keyboard focus visible and selected navigation, tabs, or filters distinct.
+- Continue existing motion patterns without distracting transitions or visible loading jumps.
+
+## Responsive Behavior
+
+- Verify the agreed control widths and task-specific widths.
+- Keep navigation and text readable rather than compressing them beyond use.
+- Preserve image proportions, intended crop, and container boundaries.
+- For complex elements such as tables, follow the project's established mobile behavior instead of inventing a new presentation without evidence.
+- Keep interactive targets usable and eliminate accidental horizontal scrolling.

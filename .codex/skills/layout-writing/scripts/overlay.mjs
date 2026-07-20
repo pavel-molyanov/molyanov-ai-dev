@@ -23,7 +23,8 @@ import {
   VISUAL_DETAIL_TILE_SIZE,
 } from "./visual-tools.mjs";
 
-const BASELINE_OUTPUT_NAMES = ["side.png", "overlay.png", "diff.png"];
+const BASELINE_OUTPUT_NAMES = ["overlay.png", "diff.png"];
+const LEGACY_OUTPUT_NAMES = ["side.png"];
 const DETAIL_OUTPUT_NAMES = [
   "details-overview.png",
   ...Array.from(
@@ -31,7 +32,22 @@ const DETAIL_OUTPUT_NAMES = [
     (_, index) => `details-candidate-${String(index + 1).padStart(2, "0")}.png`,
   ),
 ];
-const OWNED_OUTPUT_NAMES = [...BASELINE_OUTPUT_NAMES, ...DETAIL_OUTPUT_NAMES];
+const PART_COUNT = 3;
+const PART_OUTPUT_NAMES = Array.from({ length: PART_COUNT }, (_, index) => {
+  const number = String(index + 1).padStart(2, "0");
+  return [
+    `part-${number}-reference.png`,
+    `part-${number}-actual.png`,
+    `part-${number}-difference.png`,
+    `part-${number}-overlay.png`,
+  ];
+}).flat();
+const OWNED_OUTPUT_NAMES = [
+  ...BASELINE_OUTPUT_NAMES,
+  ...LEGACY_OUTPUT_NAMES,
+  ...DETAIL_OUTPUT_NAMES,
+  ...PART_OUTPUT_NAMES,
+];
 
 function imageDataUrl(path) {
   const extension = extname(path).toLowerCase();
@@ -126,6 +142,19 @@ function prepareOverlayOutput({ out, reference, actual }) {
   };
 }
 
+function clearOwnedOutputs(outDir) {
+  for (const name of OWNED_OUTPUT_NAMES) {
+    const path = join(outDir, name);
+    try {
+      rmSync(path, { force: true });
+    } catch (error) {
+      throw new Error(
+        `cannot remove stale output ${path}: ${error.message}`,
+      );
+    }
+  }
+}
+
 async function main() {
   const { values } = parseArgs({
     options: {
@@ -135,6 +164,7 @@ async function main() {
       "project-root": { type: "string", default: process.cwd() },
       opacity: { type: "string", default: "0.5" },
       details: { type: "boolean", default: false },
+      parts: { type: "string" },
       threshold: {
         type: "string",
         default: String(VISUAL_DETAIL_DEFAULT_THRESHOLD),
@@ -143,7 +173,7 @@ async function main() {
   });
   if (!values.reference || !values.actual) {
     throw new Error(
-      "usage: overlay.mjs --reference <image> --actual <image> --project-root <repo>",
+      "usage: overlay.mjs --reference <image> --actual <image> --project-root <repo> [--parts 3]",
     );
   }
 
@@ -154,6 +184,13 @@ async function main() {
   const threshold = Number(values.threshold);
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 255) {
     throw new Error("--threshold must be between 0 and 255");
+  }
+  const parts = values.parts === undefined ? null : Number(values.parts);
+  if (parts !== null && parts !== PART_COUNT) {
+    throw new Error(`--parts supports exactly ${PART_COUNT} parts`);
+  }
+  if (parts !== null && values.details) {
+    throw new Error("--parts and --details are separate modes");
   }
 
   const { outDir, referencePath, actualPath } = prepareOverlayOutput({
@@ -174,6 +211,7 @@ async function main() {
       <canvas id="overlay"></canvas>
       <canvas id="diff"></canvas>
       <canvas id="side"></canvas>
+      <canvas id="part"></canvas>
     `);
     await page.waitForFunction(() =>
       [...document.images].every(
@@ -192,6 +230,12 @@ async function main() {
       },
     }));
     assertMatchingDimensions(dimensions.reference, dimensions.actual);
+    if (parts !== null && dimensions.reference.height < parts) {
+      throw new Error(
+        `--parts ${parts} requires images at least ${parts}px high`,
+      );
+    }
+    clearOwnedOutputs(outDir);
 
     const detailData = await page.evaluate(
       ({
@@ -279,16 +323,6 @@ async function main() {
         }
         diffContext.putImageData(diffImage, 0, 0);
 
-        const gap = 24;
-        const side = document.querySelector("#side");
-        side.width = width * 2 + gap;
-        side.height = height;
-        const sideContext = side.getContext("2d");
-        sideContext.fillStyle = "#111";
-        sideContext.fillRect(0, 0, side.width, side.height);
-        sideContext.drawImage(reference, 0, 0);
-        sideContext.drawImage(actual, width + gap, 0);
-
         return detailsEnabled ? { activePixelCount, tileScores } : null;
       },
       {
@@ -300,14 +334,64 @@ async function main() {
       },
     );
 
-    for (const name of ["overlay", "diff", "side"]) {
+    if (parts !== null) {
+      for (let index = 0; index < parts; index += 1) {
+        const number = String(index + 1).padStart(2, "0");
+        for (const [source, suffix] of [
+          ["reference", "reference"],
+          ["actual", "actual"],
+          ["diff", "difference"],
+          ["overlay", "overlay"],
+        ]) {
+          await page.evaluate(
+            ({ indexValue, partsValue, sourceId }) => {
+              const sourceCanvas = document.querySelector(`#${sourceId}`);
+              const sourceHeight =
+                sourceCanvas.naturalHeight || sourceCanvas.height;
+              const sourceWidth =
+                sourceCanvas.naturalWidth || sourceCanvas.width;
+              const startY = Math.floor(
+                (indexValue * sourceHeight) / partsValue,
+              );
+              const endY = Math.floor(
+                ((indexValue + 1) * sourceHeight) / partsValue,
+              );
+              const partCanvas = document.querySelector("#part");
+              partCanvas.width = sourceWidth;
+              partCanvas.height = endY - startY;
+              partCanvas
+                .getContext("2d")
+                .drawImage(
+                  sourceCanvas,
+                  0,
+                  startY,
+                  sourceWidth,
+                  partCanvas.height,
+                  0,
+                  0,
+                  sourceWidth,
+                  partCanvas.height,
+                );
+            },
+            { indexValue: index, partsValue: parts, sourceId: source },
+          );
+          await page.locator("#part").screenshot({
+            path: join(outDir, `part-${number}-${suffix}.png`),
+          });
+        }
+      }
+      console.log(
+        `[overlay] wrote ${parts} separate reference, actual, difference, and overlay sets to ${outDir}`,
+      );
+      return;
+    }
+
+    for (const name of ["overlay", "diff"]) {
       await page
         .locator(`#${name}`)
         .screenshot({ path: join(outDir, `${name}.png`) });
     }
-    console.log(
-      `[overlay] wrote overlay, diff, and side-by-side images to ${outDir}`,
-    );
+    console.log(`[overlay] wrote overlay and diff images to ${outDir}`);
 
     if (values.details) {
       const result = selectVisualDifferenceCandidates({

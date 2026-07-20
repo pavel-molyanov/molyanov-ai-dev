@@ -154,6 +154,20 @@ function runOverlay(args) {
   ]);
 }
 
+test("overlay CLI accepts only the supported three-part mode", async () => {
+  const result = await runOverlay([
+    "--reference",
+    "reference.png",
+    "--actual",
+    "actual.png",
+    "--parts",
+    "2",
+  ]);
+
+  assert.notEqual(result.exitCode, 0, result.output);
+  assert.match(result.output, /--parts supports exactly 3 parts/i);
+});
+
 test("overlay CLI rejects a stale detail used as an input before cleanup", async () => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "layout-overlay-test-"));
   const outDir = join(temporaryRoot, "out");
@@ -334,7 +348,6 @@ test(
     const referencePath = join(temporaryRoot, "reference.png");
     const actualPath = join(temporaryRoot, "actual.png");
     const baselineSentinels = new Map([
-      ["side.png", Buffer.from("side-sentinel")],
       ["overlay.png", Buffer.from("overlay-sentinel")],
       ["diff.png", Buffer.from("diff-sentinel")],
     ]);
@@ -447,16 +460,14 @@ test(
       assert.deepEqual((await readdir(defaultOutDir)).sort(), [
         "diff.png",
         "overlay.png",
-        "side.png",
       ]);
-      for (const name of ["side.png", "overlay.png", "diff.png"]) {
+      for (const name of ["overlay.png", "diff.png"]) {
         assert.deepEqual(
           await readFile(join(defaultOutDir, name)),
           await readFile(join(detailsOutDir, name)),
         );
       }
       for (const name of [
-        "side.png",
         "overlay.png",
         "diff.png",
         "details-overview.png",
@@ -536,7 +547,7 @@ test(
       "--out",
       outDir,
     ];
-    const expectedBaseline = ["diff.png", "overlay.png", "side.png"];
+    const expectedBaseline = ["diff.png", "overlay.png"];
     try {
       await writeFile(
         referencePath,
@@ -586,6 +597,81 @@ test(
       const zeroResult = await runOverlay(commonArgs);
       assert.equal(zeroResult.exitCode, 0, zeroResult.output);
       assert.deepEqual((await readdir(outDir)).sort(), expectedBaseline);
+    } finally {
+      await rm(temporaryRoot, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "overlay CLI parts mode writes three separate sequential comparison sets",
+  {
+    skip: playwrightProjectRoot
+      ? false
+      : "set LAYOUT_WRITING_TEST_PROJECT_ROOT to a Playwright project",
+  },
+  async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "layout-overlay-test-"));
+    const referencePath = join(temporaryRoot, "reference.png");
+    const actualPath = join(temporaryRoot, "actual.png");
+    const outDir = join(temporaryRoot, "parts");
+    try {
+      await writeFile(
+        referencePath,
+        createPng(12, 10, (x, y) => [x, y, 0, 255]),
+      );
+      await writeFile(
+        actualPath,
+        createPng(12, 10, (x, y) => [x, y, y >= 3 && y < 6 ? 255 : 0, 255]),
+      );
+
+      const result = await runOverlay([
+        "--reference",
+        referencePath,
+        "--actual",
+        actualPath,
+        "--project-root",
+        playwrightProjectRoot,
+        "--out",
+        outDir,
+        "--parts",
+        "3",
+      ]);
+
+      assert.equal(result.exitCode, 0, result.output);
+      assert.deepEqual(
+        (await readdir(outDir)).sort(),
+        ["01", "02", "03"]
+          .flatMap((number) =>
+            ["actual", "difference", "overlay", "reference"].map(
+              (kind) => `part-${number}-${kind}.png`,
+            ),
+          )
+          .sort(),
+      );
+
+      const expectedHeights = [3, 3, 4];
+      for (let index = 0; index < expectedHeights.length; index += 1) {
+        const number = String(index + 1).padStart(2, "0");
+        for (const kind of ["reference", "actual", "difference", "overlay"]) {
+          const image = decodePng(
+            await readFile(join(outDir, `part-${number}-${kind}.png`)),
+          );
+          assert.deepEqual(
+            { width: image.width, height: image.height },
+            { width: 12, height: expectedHeights[index] },
+          );
+        }
+      }
+
+      const firstDifference = decodePng(
+        await readFile(join(outDir, "part-01-difference.png")),
+      );
+      const secondDifference = decodePng(
+        await readFile(join(outDir, "part-02-difference.png")),
+      );
+      assert.deepEqual(firstDifference.pixelAt(0, 0).slice(0, 3), [0, 0, 0]);
+      assert.deepEqual(secondDifference.pixelAt(0, 0).slice(0, 3), [255, 0, 0]);
     } finally {
       await rm(temporaryRoot, { recursive: true, force: true });
     }
