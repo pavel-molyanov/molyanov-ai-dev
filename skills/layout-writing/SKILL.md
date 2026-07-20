@@ -1,0 +1,78 @@
+---
+name: layout-writing
+description: |
+  Reproduces and adjusts web layouts from Figma, Claude Design exports, screenshots, or an existing project style with high visual fidelity and proportional verification.
+  Use when: "сверстай по Figma", "поправь вёрстку", "подвинь блок", "перенеси из Claude Design", "сделай адаптив", "добавь в том же стиле", "implement layout", "match Figma", "fix responsive layout".
+  Use alongside code-writing for mixed layout and business-logic tasks; use code-writing alone for logic-only work. Blank-slate visual design is outside this skill.
+---
+
+# Layout Writing
+
+Deliver a layout that matches its source, works at the relevant widths, and fits the existing codebase. Keep the process proportional: a two-line alignment fix should stay small; a Figma section needs exact reference comparison.
+
+## Ownership
+
+- `layout-writing` owns markup structure, styles, responsive behavior, typography application, asset placement, animation presentation, and visual verification.
+- `code-writing` owns data flow, state, APIs, validation, and business behavior. For mixed work, use both skills and keep this ownership split explicit.
+- Reproduce or extend an existing visual language. If the task requires inventing a design from a blank canvas, ask for a design source or a separate design decision.
+
+## Phase 1: Establish the Target
+
+1. Classify the scope as `micro`, `component`, `section`, or `page`. Record the requested route/component, relevant widths, and whether logic work is mixed in.
+2. Read only the project context needed for the target: repository instructions, the current component/template, its styles, tokens, fonts, nearby components, assets, and the run/build command.
+3. Open and read the source-mode reference before implementation:
+   - When a mockup or visual reference is supplied (Figma, Claude Design export, PDF, or screenshot), open and read [reproduce.md](references/reproduce.md) in full, then follow its matching source section.
+   - When no mockup is supplied and the task extends an existing project style, open and read [design-decisions.md](references/design-decisions.md) in full.
+   - For a hybrid task that reproduces a supplied source and fills unspecified details from the existing style, open and read both references in that order.
+4. Load each applicable stack adapter:
+   - For WordPress or PHP themes, follow [stack-wordpress.md](references/stack-wordpress.md).
+   - For Next.js or Tailwind projects, follow [stack-tailwind-next.md](references/stack-tailwind-next.md).
+   - For a hybrid stack, apply the WordPress adapter to template, build, enqueue, and generated-asset ownership, and the frontend adapter to tokens, components, and runtime behavior. Repository instructions resolve conflicts.
+5. Resolve decisions in one compact batch when needed:
+   - If the task must invent or materially change mobile behavior and no mobile source exists, propose the content order, column collapse, hidden elements, animation simplifications, and long-content/image behavior. Get the user's agreement before implementation. A micro change that preserves established responsive behavior only needs inspection in its existing mobile context.
+   - If the source conflicts with an established token or component, show the conflicting values, realistic options, and a recommendation. Get the user's agreement.
+   - If a required source font or asset is unavailable, identify exactly what is missing and offer supply/import/licensed-substitute options. Get the user's agreement before substituting it.
+   - If an adjacent problem appears outside the request, explain it and ask before expanding scope.
+
+**Checkpoint:** The required source-mode reference was read; the source, scope, relevant widths, project constraints, and any required user decisions are known.
+
+## Phase 2: Implement and Compare
+
+1. Reuse the project's tokens, components, layout primitives, fonts, and asset pipeline where they reproduce the source. Keep semantic markup and styling local to the component or system that owns it.
+2. Implement responsive behavior from the supplied desktop and mobile sources. Use the fewest breakpoints supported by an actual layout transition; interpolate ordinary spacing and sizing between supplied widths.
+3. Run a visual loop whose depth matches the scope:
+   - `micro`: render the affected width, inspect the changed area in context, and correct the visible issue. When the requirement names an exact numeric displacement or unchanged neighbors, record narrow before/after computed geometry at the affected widths; do not add overlays or font audits unless their dimensions are in scope.
+   - `component`: inspect the component at the supplied desktop/mobile widths and any breakpoint directly affected by the change.
+   - `section` or `page` from Figma/Claude Design: for every supplied authoritative viewport, render the route at the parent frame's viewport width and compare the same positioning context with an exact reference overlay. Record expected font family/weight/style and runtime load evidence. Correct background, loaded font, geometry, centering, alignment, spacing, crop, and overflow until no major visible mismatch remains.
+   - For source-backed `component`, `section`, or `page` work where fidelity is primary, inspect the same native-size evidence in four focused passes: macro background and geometry; typography and line wrapping; imagery, decoration, crop, and layering; then fine spacing, borders, radii, shadows, and small alignment offsets. These are inspection passes over one evidence set, not extra renders. An overall resemblance does not replace the detail passes. For `micro`, inspect the changed dimension and nearby regressions in the same local context at affected widths; skip unrelated passes.
+4. Use the helpers when the project has no better equivalent:
+   - Capture deterministic evidence with `node scripts/capture.mjs --url <url> --project-root <repo> --viewports <parent-width>x<stable-browser-height> --selector <positioning-context> --expect-font 'Runtime-family|Weight|Style|CSS-selector|Rendered-family' --out <dir>` from this skill directory. Repeat font requirements for materially different text; allow a known emoji/icon fallback with `--allow-font <family>`. If the report marks evidence incomplete, resolve or disclose the listed lazy-media/font problem before claiming visual verification.
+   - Compare exact-size images with `node scripts/overlay.mjs --reference <source.png> --actual <capture.png> --project-root <repo> --out <dir>` from this skill directory. Add `--details` for a boxed native-size overview and up to five native-pixel 2×2 candidate sheets; the optional `--threshold <0-255>` defaults to `16`. A warning appears when at least 50% of pixels exceed the threshold, but the full-size comparison remains the source of truth.
+   - Prefer an existing project/browser runner. If neither it nor Playwright is available, ask before adding tooling and state that visual verification remains incomplete until evidence can be captured.
+   - Diagnose dimension mismatches instead of silently resizing images.
+5. Run the smallest relevant project check that proves the changed route still compiles or renders, using the discovered build/lint/test command.
+6. Include basic interface accessibility in the implementation: semantic elements, keyboard operation, visible focus, usable contrast, and roughly 44px interactive targets. A full WCAG audit requires separate scope.
+
+**Checkpoint:** The implementation has been viewed at the relevant widths, exact-source work has an overlay, and major visible mismatches or horizontal overflow are absent.
+
+## Phase 3: Review and Hand Off
+
+1. Capture final handoff screenshots at `375px` and `1440px`. Add supplied source widths for exact overlays when they differ. Add `768px`, `320px`, dark mode, or WebKit only when the layout or task makes them relevant.
+2. Invoke a fresh `layout-reviewer` once for every layout task. Give it local or attached source visuals for every applicable width, an overlay or complete overlay-slice set when required, relevant widths, requested scope, and every touched file; URLs/node IDs are supplemental provenance. Include exact-font evidence for Figma/Claude section/page reproduction and whenever typography or wrapping is in scope. For a micro fix, keep the evidence narrow; an exact numeric request receives its user-stated requirement, before/after geometry, final context capture, and touched rule.
+3. Judge each in-scope reviewer finding against the source before editing:
+   - `agree`: the evidence establishes the mismatch — fix it;
+   - `disagree`: the source or measurements contradict it — keep the implementation and record why;
+   - `uncertain`: follow the finding's deciding action — take the stated measurement first when it can settle the concern; otherwise make a reversible trial, compare the source, pre-change result, and trial result, then keep the trial only when the affected dimensions improve.
+     Ask before handling out-of-scope findings or disputed design choices.
+4. After a substantial reviewer-driven visual change, invoke one fresh reviewer for a narrow recheck of only the affected dimensions. A change is substantial when it alters layout flow, responsive behavior, shared styling, multiple elements, or measured text wrapping or block bounds. A single local correction, including typography, is small when its measured effect stays confined and does not change wrapping or flow. Reuse artifacts, not prior-agent context: pass the original scope, affected dimensions and files, source evidence for them, updated capture/comparison, and preserved pre-change evidence when relevant; omit unrelated widths and discovery material.
+5. Hand off with a short summary, verification performed, known limitations, reviewer-finding dispositions, and the final mobile and desktop screenshots.
+
+**Checkpoint:** The reviewer completed, its findings were handled transparently, and final evidence is ready for the user.
+
+## Self-Verification
+
+- [ ] The required source-mode reference was read, and any source/design-system/mobile/asset decision was agreed with the user.
+- [ ] Every supplied authoritative viewport was compared in its positioning context; page-scope work used complete slice coverage plus an overview.
+- [ ] Exact-source evidence received focused macro, typography, imagery, and fine-detail inspection; loaded typography, geometry, crop, responsive behavior, and overflow hold.
+- [ ] Each reviewer finding was accepted, rejected, or tested with evidence; one proportional reviewer completed, plus a narrow fresh recheck after substantial fixes.
+- [ ] Final `375px` and `1440px` screenshots, plus applicable exact-source evidence, are shown to the user.

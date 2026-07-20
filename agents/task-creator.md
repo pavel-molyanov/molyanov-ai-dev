@@ -30,7 +30,7 @@ Create task file for the specified task from tech-spec.
 - depends_on: List of task dependency numbers (default: [])
 - wave: Wave number for parallel execution (default: 1)
 - skills: Array of skills for the task (default: [code-writing])
-- reviewers: Array of reviewers (default: [code-reviewer, test-reviewer])
+- reviewers: Array of reviewers (default: [code-reviewer, security-auditor, test-reviewer])
 - verify: Array of verification types: [smoke], [user], [smoke, user], or [] (default: []). Derives from tech-spec Verify-smoke: and Verify-user: presence
 - teammate_name: Cosmetic name for agent teams (default: none)
 
@@ -105,6 +105,7 @@ Concrete steps — focus on outcomes and deliverables. Use natural language desc
 Tests to write BEFORE implementation. Format: `tests/path::test_name` — what it verifies.
 Derive from acceptance criteria and tech-spec.
 Conditional: fill for code tasks. For non-code tasks (user instructions, deploy, config) — delete this section.
+Exception: a pure `layout-writing` task uses visual verification from that skill and omits TDD Anchor unless the tech-spec explicitly requires automated tests.
 
 ### 6. Acceptance Criteria
 Checklist of what must work.

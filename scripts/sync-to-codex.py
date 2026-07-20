@@ -81,6 +81,7 @@ class PlanItem:
     target: Path
     adapter: str
     content: str | None = None
+    raw_bytes: bytes | None = None
     mode: int = 0o644
     reason: str = ""
     manifest_source: Path | None = None
@@ -109,10 +110,40 @@ def sha256_text(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
 def contains_secret_like_content(text: str) -> bool:
     for line in text.splitlines():
         if SECRET_LINE_RE.search(line) and not SECRET_PLACEHOLDER_RE.search(line):
             return True
+    return False
+
+
+def opaque_bytes_look_secret(data: bytes) -> bool:
+    """Secret scan for byte-copied (non-.md) skill files.
+
+    Text-decodable payloads (scripts, JSON) get the same strict line-oriented
+    scan as read_text_source. True binaries can't be scanned line-by-line
+    without false-positiving on random byte runs, so they only get a targeted,
+    low-false-positive check for an ASCII PEM key header — the most common
+    accidental leak. DER/binary key material without that header is a known,
+    accepted residual gap under the trusted single-author source model.
+    """
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        # Non-UTF-8 binary: line-scanning random bytes false-positives, so only
+        # probe for an ASCII PEM key header, incl. NUL-interleaved wide encodings.
+        return b"-----BEGIN" in data or b"-----BEGIN" in data.replace(b"\x00", b"")
+    if contains_secret_like_content(text):
+        return True
+    # Wide-encoded (UTF-16/32) text still decodes as UTF-8 but with interleaved
+    # NUL bytes that defeat the line scanner; strip them and re-scan so secrets
+    # in such files are caught too. DER/binary key material stays a residual gap.
+    if "\x00" in text:
+        return contains_secret_like_content(text.replace("\x00", ""))
     return False
 
 
@@ -175,20 +206,10 @@ def is_agent_toml_rel(rel: Path) -> bool:
     )
 
 
-def is_command_skill_rel(rel: Path) -> bool:
-    """A managed source-command skill dir where a mirrored symlink leaf is allowed."""
-    leaf = rel.parts[-1] if rel.parts else ""
-    if not leaf.startswith("source-command-"):
-        return False
-    return (len(rel.parts) == 2 and rel.parts[0] == "skills") or (
-        len(rel.parts) == 3 and rel.parts[:2] == (".codex", "skills")
-    )
-
-
 def is_skill_dir_rel(rel: Path) -> bool:
     """A skills/<name> dir where a mirrored (nested-project) symlink leaf is allowed.
 
-    Unlike command skills this matches any leaf name: shared skills live in
+    Matches any leaf name: shared skills and source-command skills live in
     nested-project and the parent project symlinks them (single source of truth).
     """
     return (len(rel.parts) == 2 and rel.parts[0] == "skills") or (
@@ -198,7 +219,7 @@ def is_skill_dir_rel(rel: Path) -> bool:
 
 def is_mirror_leaf_rel(rel: Path) -> bool:
     """Whether a managed target may carry a mirrored (nested-project) symlink leaf."""
-    return is_agent_toml_rel(rel) or is_command_skill_rel(rel) or is_skill_dir_rel(rel)
+    return is_agent_toml_rel(rel) or is_skill_dir_rel(rel)
 
 
 def read_text_source(path: Path, root: Path) -> str:
@@ -209,6 +230,22 @@ def read_text_source(path: Path, root: Path) -> str:
     if contains_secret_like_content(text):
         raise ProtectedPathError(f"secret-looking source content rejected: {path}")
     return text
+
+
+def read_binary_source(path: Path, root: Path) -> bytes:
+    """Read a non-.md skill file as opaque bytes for verbatim copy.
+
+    Applies the same path/symlink/secret guards as read_text_source, but never
+    decodes or text-adapts the content, so binary assets don't crash and scripts
+    aren't mangled by tool-term substitution.
+    """
+    rel = safe_relative(path, root)
+    reject_protected_path(rel)
+    reject_symlink(path)
+    data = path.read_bytes()
+    if opaque_bytes_look_secret(data):
+        raise ProtectedPathError(f"secret-looking source content rejected: {path}")
+    return data
 
 
 def lexical_relative(path: Path, root: Path) -> Path:
@@ -315,23 +352,22 @@ def validate_any_target(path: Path, config: SyncConfig, allow_template_stale: bo
         validate_target(path, config.codex_root, allow_template_stale=allow_template_stale, symlink_leaf=symlink_leaf)
 
 
-def add_header(content: str, source: Path, comment: str) -> str:
+def add_header(content: str, source: Path) -> str:
+    """Prepend a hash-comment provenance header (after a shebang when present)."""
     marker = f"Generated from {source} by sync-to-codex v{VERSION}. Do not edit directly."
-    line = f"{comment[0]} {marker} {comment[1]}\n" if len(comment) == 2 else f"{comment}{marker}\n"
+    line = f"# {marker}\n"
     if content.startswith(line):
         return content
-    if comment == "# " and content.startswith("#!"):
+    if content.startswith("#!"):
         first_newline = content.find("\n") + 1
         return content[:first_newline] + line + content[first_newline:]
     return line + content
 
 
-def add_generated_header(content: str, comment: str) -> str:
+def add_generated_header(content: str, prefix: str, suffix: str = "") -> str:
+    """Prepend a generated-file header; for Markdown it lands after the frontmatter."""
     marker = f"Generated by sync-to-codex v{VERSION}. Do not edit directly."
-    if comment == "#":
-        line = f"# {marker}\n"
-        return content if content.startswith(line) else line + content
-    line = f"{comment[0]} {marker} {comment[1]}\n" if len(comment) == 2 else f"{comment}{marker}\n"
+    line = f"{prefix} {marker} {suffix}\n" if suffix else f"{prefix} {marker}\n"
     if content.startswith(line):
         return content
     if content.startswith("---\n"):
@@ -345,9 +381,7 @@ def add_generated_header(content: str, comment: str) -> str:
 def adapt_common_text(text: str) -> str:
     replacements = [
         ("CLAUDE.md", "AGENTS.md"),
-        (".claude/", ".codex/"),
         (".claude", ".codex"),
-        ("~/.claude", "~/.codex"),
         ("Claude Code", "Codex"),
         ("TodoWrite", "update_plan"),
         ("TaskCreate", "spawn_agent"),
@@ -616,7 +650,7 @@ def template_codex_target_rel(source_rel: Path) -> Path | None:
 def adapt_template_file(source: Path, source_root: Path) -> str:
     text = adapt_common_text(read_text_source(source, source_root))
     if source.suffix == ".md":
-        return add_generated_header(text, ("<!--", "-->"))
+        return add_generated_header(text, "<!--", "-->")
     return text
 
 
@@ -625,8 +659,43 @@ def adapt_skill_file(source: Path, source_root: Path) -> str:
     if source.name == "SKILL.md":
         validate_skill_frontmatter(text, source)
     if source.suffix == ".md":
-        text = add_generated_header(text, ("<!--", "-->"))
+        text = add_generated_header(text, "<!--", "-->")
     return text
+
+
+def make_skill_file_item(
+    source: Path,
+    read_root: Path,
+    target: Path,
+    adapter: str,
+    manifest_targets: dict[str, str],
+) -> PlanItem:
+    """Build a plan item for one skill file (validated target supplied by caller).
+
+    Markdown is text-adapted (tool terms, header, frontmatter check). Any other
+    file — scripts, images, data — is copied byte-for-byte with its executable
+    bit preserved, so binary assets don't crash the sync and scripts aren't
+    mangled by tool-term substitution.
+    """
+    if source.suffix.lower() == ".md":
+        content = adapt_skill_file(source, read_root)
+        return PlanItem(
+            action=classify_managed_write(target, content, manifest_targets),
+            source=source,
+            target=target,
+            adapter=adapter,
+            content=content,
+        )
+    data = read_binary_source(source, read_root)
+    mode = 0o755 if source.stat().st_mode & 0o111 else 0o644
+    return PlanItem(
+        action=classify_managed_write_bytes(target, data, manifest_targets),
+        source=source,
+        target=target,
+        adapter=adapter,
+        raw_bytes=data,
+        mode=mode,
+    )
 
 
 def adapt_create_backlog(source: Path, source_root: Path) -> str:
@@ -654,7 +723,7 @@ def adapt_create_backlog(source: Path, source_root: Path) -> str:
     )
     text = text.replace("update_instructions_md(args.codex_md, args.slug)", "update_instructions_md(args.instructions_md, args.slug)")
     text = text.replace("update_instructions_md(args.claude_md, args.slug)", "update_instructions_md(args.instructions_md, args.slug)")
-    return add_header(text, source, "# ")
+    return add_header(text, source)
 
 
 def source_name(path: Path) -> str:
@@ -898,7 +967,7 @@ def build_command_skill(source: Path, source_root: Path) -> tuple[str, str]:
         "Treat Claude-only tool names as conceptual workflow steps and use available Codex tools/policies.\n\n"
         f"{body}"
     )
-    content = add_generated_header(content, ("<!--", "-->"))
+    content = add_generated_header(content, "<!--", "-->")
     assert_no_operational_leftovers(content, source)
     return slug, content
 
@@ -997,7 +1066,7 @@ def make_skill_symlink_item(
     )
 
 
-def build_template_items(config: SyncConfig) -> list[PlanItem]:
+def build_template_items(config: SyncConfig, manifest_targets: dict[str, str]) -> list[PlanItem]:
     source_root = config.claude_root / TEMPLATE_REL
     target_root = config.codex_root / TEMPLATE_REL
     if not source_root.is_dir():
@@ -1014,7 +1083,7 @@ def build_template_items(config: SyncConfig) -> list[PlanItem]:
         validate_target(source_target, config.codex_root)
         items.append(
             PlanItem(
-                action=classify_write(source_target, source_content),
+                action=classify_managed_write(source_target, source_content, manifest_targets),
                 source=source,
                 target=source_target,
                 adapter="new-project-template",
@@ -1027,28 +1096,50 @@ def build_template_items(config: SyncConfig) -> list[PlanItem]:
         content = adapt_template_file(source, config.claude_root)
         target = target_root / codex_rel
         validate_target(target, config.codex_root)
-        action = classify_write(target, content)
+        action = classify_managed_write(target, content, manifest_targets)
         items.append(PlanItem(action=action, source=source, target=target, adapter="new-project-template", content=content))
     return items
 
 
-def build_script_item(config: SyncConfig) -> PlanItem:
+def build_script_item(config: SyncConfig, manifest_targets: dict[str, str]) -> PlanItem:
     source = config.claude_root / SCRIPT_REL
     target = config.codex_root / SCRIPT_REL
     content = adapt_create_backlog(source, config.claude_root)
     validate_target(target, config.codex_root)
-    return PlanItem(action=classify_write(target, content), source=source, target=target, adapter="script", content=content, mode=0o755)
+    return PlanItem(
+        action=classify_managed_write(target, content, manifest_targets),
+        source=source,
+        target=target,
+        adapter="script",
+        content=content,
+        mode=0o755,
+    )
 
 
-def build_skill_items(config: SyncConfig) -> list[PlanItem]:
+def build_skill_items(
+    config: SyncConfig,
+    manifest_targets: dict[str, str],
+    manifest_links: dict[str, str],
+    warnings: list[str],
+) -> list[PlanItem]:
     source_root = config.claude_root / "skills"
     target_root = config.codex_root / "skills"
     if not source_root.is_dir():
         return []
     items: list[PlanItem] = []
     skill_names: set[str] = set()
-    for skill_dir in sorted(path for path in source_root.iterdir() if path.is_dir()):
+    for skill_dir in sorted(path for path in source_root.iterdir() if path.is_dir() or path.is_symlink()):
         validate_slug(skill_dir.name)
+        # A skill dir that is itself a symlink (shared from a nested project) is
+        # mirrored as a symlink, never walked/copied file-by-file. A link whose
+        # mirror would leave ~/.codex (e.g. pointing into ~/projects) cannot be
+        # mirrored; skip it with a warning instead of failing the whole sync.
+        if skill_dir.is_symlink():
+            try:
+                items.append(make_skill_symlink_item(skill_dir, target_root, "skill", config, manifest_links))
+            except ProtectedPathError as exc:
+                warnings.append(f"skipping skill symlink that cannot be mirrored into codex root: {skill_dir} ({exc})")
+            continue
         skill_md = skill_dir / "SKILL.md"
         if skill_md.exists():
             content = read_text_source(skill_md, config.claude_root)
@@ -1062,9 +1153,8 @@ def build_skill_items(config: SyncConfig) -> list[PlanItem]:
             if not is_syncable_file(source_rel):
                 continue
             target = target_root / source_rel
-            content = adapt_skill_file(source, config.claude_root)
             validate_target(target, config.codex_root)
-            items.append(PlanItem(action=classify_write(target, content), source=source, target=target, adapter="skill", content=content))
+            items.append(make_skill_file_item(source, config.claude_root, target, "skill", manifest_targets))
     return items
 
 
@@ -1102,33 +1192,65 @@ def build_command_items(
     return items
 
 
-def classify_write(target: Path, content: str) -> str:
-    if not target.exists():
-        return "create"
-    if target.read_text(encoding="utf-8") == content:
-        return "skip unchanged"
-    return "update"
-
-
 STALE_GLOBS = ("skills/claude-agent-*", "skills/claude-command-*", "agents/*.md", "commands/*")
+GENERATED_MARKER = "by sync-to-codex v"
 
 
-def build_stale_items(base: Path, prune: bool, reason: str) -> list[PlanItem]:
+def has_generation_marker(path: Path) -> bool:
+    """Marker-based ownership evidence, independent of the manifest.
+
+    For directories the probe is SKILL.md — every generated skill dir carries
+    the marker there.
+    """
+    probe = path / "SKILL.md" if path.is_dir() else path
+    if not probe.is_file():
+        return False
+    try:
+        return GENERATED_MARKER in probe.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+
+
+def is_sync_owned(path: Path, manifest_targets: dict[str, str], manifest_links: dict[str, str]) -> bool:
+    """Whether a path was produced by this sync: manifest record or generated header.
+
+    Hand-made files that merely match a stale glob must never be deleted, so
+    ownership requires positive evidence.
+    """
+    if str(path) in manifest_links:
+        return True
+    if path.is_symlink():
+        return False
+    if str(path.resolve()) in manifest_targets:
+        return True
+    return has_generation_marker(path)
+
+
+def build_stale_items(
+    base: Path,
+    prune: bool,
+    reason: str,
+    manifest_targets: dict[str, str],
+    manifest_links: dict[str, str],
+) -> list[PlanItem]:
     """Collect legacy wrapper artifacts under a Codex base dir for pruning.
 
     Old layout used `skills/claude-agent-*`, `skills/claude-command-*`,
     markdown `agents/*.md` references, and a dead `commands/*` mirror; the new
     layout emits `agents/*.toml` and `skills/source-command-*` instead.
+    Paths without ownership evidence are reported but never deleted.
     """
-    stale_paths: list[Path] = []
+    items: list[PlanItem] = []
     for pattern in STALE_GLOBS:
         for path in sorted(base.glob(pattern)):
-            stale_paths.append(path)
-    action = "delete" if prune else "stale managed"
-    return [
-        PlanItem(action=action, source=None, target=path, adapter="stale", reason=reason)
-        for path in stale_paths
-    ]
+            if is_sync_owned(path, manifest_targets, manifest_links):
+                action = "delete" if prune else "stale managed"
+                item_reason = reason
+            else:
+                action = "skip unmanaged"
+                item_reason = "matches legacy pattern but was not created by sync; left untouched"
+            items.append(PlanItem(action=action, source=None, target=path, adapter="stale", reason=item_reason))
+    return items
 
 
 def build_template_stale_items(config: SyncConfig, prune: bool) -> list[PlanItem]:
@@ -1183,18 +1305,9 @@ def build_project_items(
                     continue
                 if source.name.startswith("settings") and source.suffix == ".json":
                     continue
-                content = adapt_skill_file(source, project)
                 target = codex_skills_dir / source_rel
                 validate_project_target(target, project)
-                items.append(
-                    PlanItem(
-                        action=classify_managed_write(target, content, manifest_targets),
-                        source=source,
-                        target=target,
-                        adapter="project-skill",
-                        content=content,
-                    )
-                )
+                items.append(make_skill_file_item(source, project, target, "project-skill", manifest_targets))
     agents_dir = project / ".claude" / "agents"
     if agents_dir.is_dir():
         for source in sorted(agents_dir.glob("*.md")):
@@ -1211,7 +1324,9 @@ def build_project_items(
             )
             if item is not None:
                 items.append(item)
-    items.extend(build_stale_items(project / ".codex", prune, "Claude-shaped Codex wrapper leftover"))
+    items.extend(
+        build_stale_items(project / ".codex", prune, "Claude-shaped Codex wrapper leftover", manifest_targets, manifest_links)
+    )
     return items
 
 
@@ -1252,64 +1367,190 @@ def classify_managed_write(target: Path, content: str, manifest_targets: dict[st
     return "update"
 
 
+def classify_managed_write_bytes(target: Path, data: bytes, manifest_targets: dict[str, str]) -> str:
+    if not target.exists():
+        return "create"
+    current = target.read_bytes()
+    if current == data:
+        return "skip unchanged"
+    previous_hash = manifest_targets.get(str(target.resolve()))
+    if previous_hash and sha256_bytes(current) != previous_hash:
+        return "conflict target edited"
+    return "update"
+
+
+def planned_output_key(item: PlanItem) -> str:
+    """The manifest-comparable key for a planned target (lexical for symlink leaves)."""
+    if item.link_target is not None:
+        return str(item.target)
+    return str(item.target.resolve())
+
+
+def orphan_ownership_evidence(path: Path, output: dict) -> bool:
+    """Evidence beyond the manifest record that sync produced this output.
+
+    In project mode the manifest ships inside the repo, so its records alone
+    must not authorize deletion. Symlinks must match the recorded link string,
+    directories need a marked SKILL.md, files need the generated marker or
+    content byte-identical to the recorded output hash (markerless outputs
+    like .gitignore or .mcp.json).
+    """
+    if path.is_symlink():
+        recorded = output.get("link_target")
+        return bool(recorded) and os.readlink(str(path)) == recorded
+    if path.is_dir():
+        return has_generation_marker(path)
+    if has_generation_marker(path):
+        return True
+    recorded_hash = output.get("output_sha256")
+    if not recorded_hash:
+        return False
+    # Byte hash covers both markerless text outputs (.gitignore, .mcp.json) and
+    # byte-copied binary assets: a well-formed UTF-8 file's raw bytes hash equals
+    # its sha256_text, so one comparison matches either recording.
+    try:
+        return sha256_bytes(path.read_bytes()) == recorded_hash
+    except OSError:
+        return False
+
+
+def build_orphan_items(config: SyncConfig, items: list[PlanItem], prune: bool, warnings: list[str]) -> list[PlanItem]:
+    """Manifest-recorded outputs that no current source produces anymore.
+
+    Deleting a Claude source leaves its generated Codex output behind; report it
+    every run, but delete only under --prune --confirm-delete so removal stays
+    at the operator's discretion.
+    """
+    planned = {str(item.target) for item in items} | {planned_output_key(item) for item in items}
+    orphans: list[PlanItem] = []
+    seen: set[str] = set()
+    for entry in load_manifest(config).get("entries", []):
+        for output in entry.get("outputs", []):
+            target = output.get("target")
+            if not target or target in planned or target in seen:
+                continue
+            seen.add(target)
+            if not os.path.lexists(target):
+                continue
+            path = Path(target)
+            # The manifest is normally trustworthy (0600, written by this
+            # script), but in project mode it ships inside the repo — so orphan
+            # targets get the same allowlist/containment/symlink validation as
+            # any other target before a delete can be planned.
+            try:
+                validate_any_target(config=config, path=path, allow_template_stale=True, symlink_leaf=path.is_symlink())
+            except SyncError as exc:
+                warnings.append(f"manifest-recorded output failed target validation; not touching: {target} ({exc})")
+                continue
+            if not orphan_ownership_evidence(path, output):
+                warnings.append(f"manifest-recorded output lacks ownership evidence; not touching: {target}")
+                continue
+            orphans.append(
+                PlanItem(
+                    action="delete" if prune else "orphaned managed",
+                    source=None,
+                    target=path,
+                    adapter="orphan",
+                    reason="source removed; output no longer generated",
+                )
+            )
+    return orphans
+
+
+def dangling_link_warnings(items: list[PlanItem]) -> list[str]:
+    """Warn when a mirrored symlink points at a not-yet-synced destination.
+
+    Happens when the parent project is synced before its nested source project
+    (e.g. nested-project): the link is created but Codex has nothing to load yet.
+    """
+    warnings: list[str] = []
+    for item in items:
+        if item.link_target is None or item.action.startswith("conflict"):
+            continue
+        destination = Path(os.path.normpath(os.path.join(str(item.target.parent), item.link_target)))
+        # exists() follows symlinks: a destination that is itself a dangling
+        # link is still unloadable for Codex and must warn.
+        if not os.path.exists(destination):
+            warnings.append(
+                f"mirrored symlink target does not exist yet: {item.target} -> {item.link_target}; "
+                "sync the source project first"
+            )
+    return warnings
+
+
 def build_plan(config: SyncConfig, prune: bool) -> SyncPlan:
     manifest_targets = manifest_target_hashes(config)
     manifest_links = manifest_target_links(config)
+    warnings: list[str] = []
     if config.project_root is not None:
         items = build_project_items(config, manifest_targets, manifest_links, prune)
-        for item in items:
-            validate_any_target(item.target, config, symlink_leaf=item.link_target is not None)
-            if item.content and contains_secret_like_content(item.content):
-                raise ProtectedPathError(f"secret-looking output rejected: {item.target}")
-        return SyncPlan(items=items)
-    items = build_template_items(config)
-    items.append(build_script_item(config))
-    items.extend(build_skill_items(config))
-    items.extend(build_agent_items(config, manifest_targets, manifest_links))
-    items.extend(build_command_items(config, manifest_targets, manifest_links))
-    items.extend(build_template_stale_items(config, prune))
-    items.extend(build_stale_items(config.codex_root, prune, "Claude-shaped Codex wrapper leftover"))
+    else:
+        items = build_template_items(config, manifest_targets)
+        items.append(build_script_item(config, manifest_targets))
+        items.extend(build_skill_items(config, manifest_targets, manifest_links, warnings))
+        items.extend(build_agent_items(config, manifest_targets, manifest_links))
+        items.extend(build_command_items(config, manifest_targets, manifest_links))
+        items.extend(build_template_stale_items(config, prune))
+        items.extend(
+            build_stale_items(config.codex_root, prune, "Claude-shaped Codex wrapper leftover", manifest_targets, manifest_links)
+        )
+    items.extend(build_orphan_items(config, items, prune, warnings))
     for item in items:
+        if item.adapter == "orphan":
+            # Already validated at collection; invalid targets were downgraded
+            # to warnings there instead of failing the whole plan.
+            continue
         validate_any_target(
             item.target,
             config,
-            allow_template_stale=item.action in {"delete", "stale managed"},
+            allow_template_stale=item.action in {"delete", "stale managed", "skip unmanaged"},
             symlink_leaf=item.link_target is not None,
         )
         if item.content and contains_secret_like_content(item.content):
             raise ProtectedPathError(f"secret-looking output rejected: {item.target}")
-    return SyncPlan(items=items)
+        if item.raw_bytes is not None and opaque_bytes_look_secret(item.raw_bytes):
+            raise ProtectedPathError(f"secret-looking output rejected: {item.target}")
+    warnings.extend(dangling_link_warnings(items))
+    return SyncPlan(items=items, warnings=warnings)
 
 
-def manifest_output(item: PlanItem, source_text: str) -> dict:
+def manifest_output(item: PlanItem, source_sha256: str) -> dict:
     if item.link_target is not None:
         # Lexical target (never resolve a symlink leaf) + recorded link string.
         return {
             "target": str(item.target),
-            "source_sha256": sha256_text(source_text),
+            "source_sha256": source_sha256,
             "link_target": item.link_target,
             "sync_owned": True,
         }
+    output_sha256 = sha256_bytes(item.raw_bytes) if item.raw_bytes is not None else sha256_text(item.content or "")
     return {
         "target": str(item.target.resolve()),
-        "source_sha256": sha256_text(source_text),
-        "output_sha256": sha256_text(item.content or ""),
+        "source_sha256": source_sha256,
+        "output_sha256": output_sha256,
         "sync_owned": True,
     }
 
 
 def manifest_entry(source: Path, adapter: str, items: list[PlanItem]) -> dict:
     # A mirrored symlink source may point at a directory (shared skill); hash the
-    # link string, which is what actually determines the mirrored output.
-    source_text = os.readlink(source) if source.is_symlink() else source.read_text(encoding="utf-8")
+    # link string, which is what actually determines the mirrored output. A
+    # byte-copied (opaque) source is hashed as raw bytes, since decoding it as
+    # text would crash on binary assets.
+    if source.is_symlink():
+        source_sha256 = sha256_text(os.readlink(source))
+    elif any(planned.raw_bytes is not None for planned in items):
+        source_sha256 = sha256_bytes(source.read_bytes())
+    else:
+        source_sha256 = sha256_text(source.read_text(encoding="utf-8"))
     return {
         "source": str(source.resolve()),
         "adapter": adapter,
         "adapter_version": VERSION,
         "transformer_version": VERSION,
-        "input_set_hash": sha256_text(source_text),
+        "input_set_hash": source_sha256,
         "outputs": [
-            manifest_output(item, source_text)
+            manifest_output(item, source_sha256)
             for item in sorted(items, key=lambda planned: str(planned.target))
         ],
         "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
@@ -1321,7 +1562,7 @@ def manifest_groups(plan: SyncPlan) -> dict[tuple[str, str], tuple[Path, str, li
     for item in plan.items:
         if item.action not in {"create", "update", "skip unchanged"} or not item.source:
             continue
-        if item.content is None and item.link_target is None:
+        if item.content is None and item.link_target is None and item.raw_bytes is None:
             continue
         source = item.manifest_source or item.source
         key = (str(source.resolve()), item.adapter)
@@ -1331,11 +1572,29 @@ def manifest_groups(plan: SyncPlan) -> dict[tuple[str, str], tuple[Path, str, li
     return groups
 
 
+def manifest_is_well_formed(data: object) -> bool:
+    if not isinstance(data, dict) or not isinstance(data.get("entries"), list):
+        return False
+    for entry in data["entries"]:
+        if not isinstance(entry, dict) or not isinstance(entry.get("source"), str) or not isinstance(entry.get("adapter"), str):
+            return False
+        outputs = entry.get("outputs", [])
+        if not isinstance(outputs, list) or any(not isinstance(output, dict) for output in outputs):
+            return False
+    return True
+
+
 def load_manifest(config: SyncConfig) -> dict:
     path = manifest_path(config)
     if not path.exists():
         return {"version": VERSION, "entries": []}
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SyncError(f"corrupt sync manifest, fix or remove it: {path} ({exc})") from exc
+    if not manifest_is_well_formed(data):
+        raise SyncError(f"malformed sync manifest, fix or remove it: {path}")
+    return data
 
 
 def write_manifest(config: SyncConfig, plan: SyncPlan) -> None:
@@ -1352,6 +1611,26 @@ def write_manifest(config: SyncConfig, plan: SyncPlan) -> None:
             new_by_key[key] = old_entry
         else:
             new_by_key[key] = entry
+    # Retain entries whose source vanished while their outputs still exist on
+    # disk: dropping them would orphan the outputs untracked, so ownership is
+    # kept until the operator prunes (or otherwise removes) the outputs.
+    # Targets claimed by a current entry are dropped per-output — a new source
+    # took them over, and duplicate claims would confuse conflict detection.
+    claimed = {
+        output.get("target")
+        for entry in new_by_key.values()
+        for output in entry.get("outputs", [])
+    }
+    for key, old_entry in old_by_key.items():
+        if key in new_by_key:
+            continue
+        kept_outputs = [
+            output
+            for output in old_entry.get("outputs", [])
+            if output.get("target") not in claimed and os.path.lexists(str(output.get("target", "")))
+        ]
+        if kept_outputs:
+            new_by_key[key] = {**old_entry, "outputs": kept_outputs}
     manifest = {"version": VERSION, "entries": list(new_by_key.values())}
     path = manifest_path(config)
     validate_any_target(path, config)
@@ -1369,6 +1648,21 @@ def atomic_write_text(path: Path, content: str, mode: int) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(tmp_name, mode)
+        os.replace(tmp_name, path)
+    finally:
+        if os.path.exists(tmp_name):
+            os.unlink(tmp_name)
+
+
+def atomic_write_bytes(path: Path, data: bytes, mode: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
         os.chmod(tmp_name, mode)
@@ -1452,27 +1746,26 @@ def acquire_lock(config: SyncConfig) -> Path:
 
 
 def apply_plan(config: SyncConfig, plan: SyncPlan) -> None:
+    """Apply a plan. CLI runs hold the sync lock around plan build + apply (see main)."""
     conflicts = [item for item in plan.items if item.action.startswith("conflict")]
     if conflicts:
         paths = ", ".join(str(item.target) for item in conflicts)
         raise ConflictError(f"conflicts detected; refusing to apply: {paths}")
-    lock = acquire_lock(config)
     stop = sync_root(config)
-    try:
-        for item in plan.items:
-            if item.action in {"create", "update"}:
-                if item.link_target is not None:
-                    write_symlink(item.target, item.link_target)
-                else:
-                    assert item.content is not None
-                    atomic_write_text(item.target, item.content, item.mode)
-            elif item.action == "delete":
-                if item.target.is_symlink() or item.target.exists():
-                    remove_target(item.target)
-                    cleanup_empty_dirs(item.target.parent, stop)
-        write_manifest(config, plan)
-    finally:
-        lock.unlink(missing_ok=True)
+    for item in plan.items:
+        if item.action in {"create", "update"}:
+            if item.link_target is not None:
+                write_symlink(item.target, item.link_target)
+            elif item.raw_bytes is not None:
+                atomic_write_bytes(item.target, item.raw_bytes, item.mode)
+            else:
+                assert item.content is not None
+                atomic_write_text(item.target, item.content, item.mode)
+        elif item.action == "delete":
+            if item.target.is_symlink() or item.target.exists():
+                remove_target(item.target)
+                cleanup_empty_dirs(item.target.parent, stop)
+    write_manifest(config, plan)
 
 
 def cleanup_empty_dirs(start: Path, stop: Path) -> None:
@@ -1516,7 +1809,7 @@ def print_report(plan: SyncPlan, show_diff: bool) -> None:
 def exit_code_for_plan(plan: SyncPlan) -> int:
     if any(item.action.startswith("conflict") for item in plan.items):
         return 3
-    if any(item.action in {"create", "update", "delete", "stale managed"} for item in plan.items):
+    if any(item.action in {"create", "update", "delete", "stale managed", "orphaned managed"} for item in plan.items):
         return 1
     return 0
 
@@ -1526,7 +1819,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="Show planned changes without writing. Default.")
     mode.add_argument("--apply", action="store_true", help="Apply planned changes.")
-    mode.add_argument("--check-drift", action="store_true", help="Alias for dry-run drift-oriented report in this skeleton.")
+    mode.add_argument("--check-drift", action="store_true", help="Alias for --dry-run: report drift between sources and targets.")
     parser.add_argument("--prune", action="store_true", help="Delete stale managed template leftovers.")
     parser.add_argument("--confirm-delete", action="store_true", help="Required with --apply --prune.")
     parser.add_argument("--claude-root", type=Path, default=Path.home() / ".claude")
@@ -1549,12 +1842,20 @@ def main(argv: list[str] | None = None) -> int:
         print("--prune during --apply requires --confirm-delete", file=sys.stderr)
         return 2
     try:
-        plan = build_plan(config, prune=args.prune and args.confirm_delete)
-        print_report(plan, show_diff=not args.no_diff)
         if args.apply:
-            apply_plan(config, plan)
+            # Lock covers plan build too: a concurrently built plan would
+            # classify against state another run is about to change.
+            lock = acquire_lock(config)
+            try:
+                plan = build_plan(config, prune=args.prune and args.confirm_delete)
+                print_report(plan, show_diff=not args.no_diff)
+                apply_plan(config, plan)
+            finally:
+                lock.unlink(missing_ok=True)
             print("applied")
             return 0
+        plan = build_plan(config, prune=args.prune and args.confirm_delete)
+        print_report(plan, show_diff=not args.no_diff)
         return exit_code_for_plan(plan)
     except SyncError as exc:
         print(f"error: {exc}", file=sys.stderr)

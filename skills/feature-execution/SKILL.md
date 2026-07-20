@@ -2,7 +2,7 @@
 name: feature-execution
 description: |
   Orchestrate feature delivery as team lead: spawn agents by wave,
-  manage review cycles (max 3 rounds), commit per wave.
+  manage review cycles (max 2 rounds), commit per wave.
 
   Use when: "выполни фичу", "do feature", "execute feature", "запусти фичу",
   "выполни все задачи", "execute all tasks"
@@ -70,7 +70,9 @@ Reason: when the lead does task work, it pollutes context with implementation de
 
 1. Find tasks for current wave: `status: planned`, all `depends_on` tasks are `done`
 2. Update frontmatter: `status: planned` → `status: in_progress`. Read only frontmatter (`limit=15`), then Edit the status field. Do not read full task content.
-3. For each task, spawn **teammate + reviewers** (if task has reviewers):
+3. For each task, spawn a **teammate**. Reviewers are not pre-spawned — the lead spawns a
+   fresh reviewer instance each round on the teammate's signal (see reviewers_block below),
+   so every round gets a critic that re-reads the files from scratch.
 
    Use `teammate_name` from task frontmatter as the agent name. If not set — pick a descriptive name based on the task.
 
@@ -101,27 +103,52 @@ Reason: when the lead does task work, it pollutes context with implementation de
    **{reviewers_block}** — include only when task has reviewers (not `reviewers: none`):
 
    ```
-   Your reviewers: {reviewer_names} (list of teammate names).
+   Your reviewers: {reviewer_names}. You do not spawn them — the lead spawns a fresh
+   reviewer instance each round when you signal readiness. A fresh instance re-reads your
+   files from scratch instead of anchoring on last round's findings.
 
-   Review process — after task is complete, follow this review process (overrides review steps from loaded skills):
-   1. Run `git diff -- <your files>` and collect the list of changed files + full diff output.
-   2. Send each reviewer via SendMessage: list of changed files + full diff output.
-   3. Reviewers will perform review, write JSON report to `{feature_dir}/logs/working/task-{N}/{reviewer_name}-round{round}.json`, and send report path back to you.
-   4. Read reports, fix findings. After fixes: send updated diff to reviewers for next round.
-   5. Max 3 review rounds. Reason: diminishing returns — if 3 rounds cannot resolve findings, the issue requires human judgment. If unresolved after 3 → message team lead to escalate.
+   Review process (overrides review steps from loaded skills) — two review points:
 
-   Commit flow:
-   1. After implementation complete (tests pass): git commit `feat|fix: task {N} — {brief description}`
-   2. Send diff to reviewers for review.
-   3. After each round of fixes (tests pass): git commit `fix: address review round {M} for task {N}`
-   4. After all reviews pass (or max 3 rounds): git commit review reports with message `chore: review reports for task {N}`
+   A. Tests, before writing code:
+   Run Point A only when task reviewers include `test-reviewer`; a pure layout task with only `layout-reviewer` skips Point A and starts at Point B.
+   1. Write tests, commit them, then message the lead:
+      "Task {N}: tests ready for design review, round 1. Files: <test file paths>".
+   2. The lead spawns a fresh test-reviewer (design mode); it reads your files and writes a
+      report to {feature_dir}/logs/working/task-{N}/test-reviewer-design-{round}.json, then
+      sends you the path.
+   3. Process findings (scope rule below). Strengthen tests, commit, and signal the lead for
+      the next round if in-scope findings remain. Max 2 rounds; findings left after round 2 →
+      message the lead to escalate before writing code.
+
+   B. Code, after tests pass:
+   1. Write code, commit `feat|fix: task {N} — {brief description}` (tests pass), then message
+      the lead: "Task {N}: code ready for review, round 1. Files: <changed file paths>".
+   2. The lead spawns fresh reviewers ({reviewer_names}); each reads your files in full and
+      writes a report to {feature_dir}/logs/working/task-{N}/{reviewer_name}-{round}.json.
+   3. Process findings, fix, commit `fix: address review round {R} for task {N}`, and signal
+      the lead for the next round if in-scope findings remain. Max 2 rounds; findings left
+      after round 2 → message the lead to escalate.
+   4. After reviews settle: git commit review reports `chore: review reports for task {N}`.
+
+   Finding scope: in-scope = this task's acceptance criteria + files you touched. A finding
+   outside that (new behavior, untouched files, an unrelated pre-existing defect) → do not fix
+   it; message the lead so it reaches the user for a scope decision, and keep working your
+   in-scope items.
    ```
 
    If task has `reviewers: none` — skip reviewer spawning. The teammate works independently, commits code with message `feat|fix: task {N} — {brief description}` (tests pass), and reports completion directly to team lead.
 
-   Every task gets a spawned teammate — even tasks with no skills and no reviewers (operational tasks, MCP interactions, benchmarks, manual steps). The lead never executes task work directly.
+   Every task gets a spawned teammate — even tasks with no skills and no reviewers (operational tasks, MCP interactions, benchmarks, manual steps). The lead dispatches; teammates do the work.
 
-   **Each reviewer** (when present) — `subagent_type: "general-purpose"`, `model: "sonnet"`, `team_name: "{team}"`
+   **Each reviewer** (when present) — the lead spawns one fresh instance per round on the
+   teammate's signal, filling `{mode_line}` and `{report_path}` in the prompt template per
+   review point (see below). `subagent_type: "general-purpose"`, `model: "sonnet"`, `team_name: "{team}"`
+
+   Per review point, the lead fills:
+   - **Point A (tests)** — `{report_path}` = `{feature_dir}/logs/working/task-{N}/test-reviewer-design-{round}.json`;
+     `{mode_line}` = "Run in `design` mode: no implementation exists yet — attack test design (behavior-not-implementation, edge/error coverage, meaningful assertions, right test type), not the litmus test."
+   - **Point B (code)** — `{report_path}` = `{feature_dir}/logs/working/task-{N}/{reviewer_name}-{round}.json`;
+     `{mode_line}` for test-reviewer = "Run in `full` mode: code exists — apply the litmus test." For other reviewers `{mode_line}` is empty.
 
    Reviewer skill mapping (reviewer name → skill to load):
    - `code-reviewer` → `code-reviewing`
@@ -132,6 +159,7 @@ Reason: when the lead does task work, it pollutes context with implementation de
    - `infrastructure-reviewer` → `infrastructure-setup`
    - `skill-checker` → `skill-master`
    - `documentation-reviewer` → `documentation-writing`
+   - `layout-reviewer` → `layout-writing`
 
    Prompt template:
 
@@ -141,19 +169,22 @@ Reason: when the lead does task work, it pollutes context with implementation de
    Load your review methodology: Skill(skill="{reviewer_skill}")
    Read specs: {feature_dir}/user-spec.md, {feature_dir}/tech-spec.md
    Read task: {feature_dir}/tasks/{N}.md
+   Read in full every file the lead listed as touched — the files themselves, not a diff.
+   A hole often lives where a change now contradicts an untouched part.
+   {mode_line}
 
-   Wait for a message from teammate "{teammate_name}" with git diff of changes.
-
-   When you receive it:
-   1. Review changes following the loaded skill methodology
-   2. Write JSON report to: {feature_dir}/logs/working/task-{N}/{reviewer_name}-round{round}.json
-   3. Send report path to teammate "{teammate_name}" via SendMessage
-
-   The teammate may send updated diffs for subsequent rounds (max 3).
-   Review each round the same way. After the final round, shut down.
+   Then:
+   1. Review as a hostile critic following the loaded skill methodology — surface findings,
+      do not gate.
+   2. Write JSON report to: {report_path}
+   3. Send the report path to teammate "{teammate_name}" via SendMessage, then shut down.
    ```
 
-4. All agents work in parallel. Lead waits for teammates to report "Task complete."
+4. Teammates work in parallel. The lead stays reactive: when a teammate signals a review point
+   ("tests ready" / "code ready" for round R), the lead spawns a fresh reviewer instance for
+   that round, passing the touched-file paths from the teammate's message. When a teammate
+   reports an out-of-scope finding, the lead batches it for the user (surface at wave transition
+   or user review, not mid-wave). Lead waits for teammates to report "Task complete."
 
 ### Audit Wave tasks
 
@@ -168,21 +199,23 @@ Each auditor:
 
 After all 3 reports:
 - All clean → proceed to Final Wave
-- Issues found → spawn a fixer teammate (ad-hoc, code-writing skill), assign the auditors who found issues as reviewers, standard review protocol (max 3 rounds). After approval → proceed to Final Wave. If unresolved after 3 rounds → escalate (see Escalation).
+- Issues found → spawn a fixer teammate (ad-hoc, code-writing skill), assign the auditors who found issues as reviewers, standard review protocol (fresh reviewer each round, max 2 rounds). After approval → proceed to Final Wave. If unresolved after 2 rounds → escalate (see Escalation).
 
 ### Ad-hoc agents
 
 When lead spawns an agent outside the original execution plan (to fix audit findings, handle escalations, complete missing work):
 
 1. Lead assigns a skill and reviewers matching the type of work:
+   - Pure layout changes → skill: `layout-writing`, reviewers: layout-reviewer
+   - Mixed layout + business-logic changes → skills: `layout-writing`, `code-writing`, reviewers: layout-reviewer, code-reviewer, security-auditor, test-reviewer
    - Code changes → skill: `code-writing`, reviewers: code-reviewer, security-auditor, test-reviewer
    - Prompt changes → skill: `prompt-master`, reviewers: prompt-reviewer
    - Skill changes → skill: `skill-master`, reviewers: skill-checker
-   - Deploy/CI changes → skill: `deploy-pipeline`, reviewers: deploy-reviewer
-   - Infrastructure changes → skill: `infrastructure-setup`, reviewers: infrastructure-reviewer, security-auditor
+   - Deploy/CI changes → skill: `deploy-pipeline`, reviewers: code-reviewer, security-auditor, deploy-reviewer
+   - Infrastructure changes → skill: `infrastructure-setup`, reviewers: code-reviewer, infrastructure-reviewer, security-auditor
    - Other tasks (research, config, manual steps) → no skill, no reviewers. Agent follows lead's instructions directly.
 2. The ad-hoc agent writes a decisions.md entry (same template as planned tasks)
-3. Standard review protocol: agent commits → sends diff to reviewers → fix → max 3 rounds
+3. Standard review protocol: agent commits → signals lead → lead spawns fresh reviewers (they read the touched files) → fix → max 2 rounds
 4. Lead verifies decisions.md entry exists before considering ad-hoc work complete
 
 **Checkpoint:** all teammates reported "Task complete", decisions.md entries written.
@@ -203,26 +236,28 @@ All waves done including Final Wave (QA, deploy if applicable, post-deploy verif
 
 1. Show results: what was built, key decisions, QA report summary
 2. Describe what to check manually (from execution plan "user checks" section)
-3. Issues found → spawn ad-hoc agent to fix (see "Ad-hoc agents" in Phase 2) → review → commit (max 3 rounds). If unresolved → escalate (see Escalation).
+3. Issues found → spawn ad-hoc agent to fix (see "Ad-hoc agents" in Phase 2) → review → commit (max 2 rounds). If unresolved → escalate (see Escalation).
 4. All ok → finalize, shutdown team, delete `work/{feature}/logs/checkpoint.yml`
 
 ## Escalation
 
 Call user when:
-- 3 review/fix iterations exhausted with remaining findings
+- 2 review/fix rounds exhausted with remaining in-scope findings
+- A reviewer reports an out-of-scope finding that needs a scope decision
 - Teammate reports blocker or ambiguous requirement
 - Task depends on unavailable MCP tool or external service
 
 When escalating:
-1. Stop all work on the blocked task/wave
-2. Report to user: what failed, what was tried (all 3 attempts), what remains unresolved
+1. Stop work on the blocked task only — other in-flight tasks in the wave continue. Surface the
+   blocked task to the user without halting the whole wave (halt the wave only if every task is blocked).
+2. Report to user: what failed, what was tried (both rounds), what remains unresolved
 3. Write decisions.md entry: summary of attempts + unresolved findings
-4. Git commit: `chore: escalate task {N} — unresolved after 3 fix rounds`
+4. Git commit: `chore: escalate task {N} — unresolved after 2 fix rounds`
 5. Wait for user decision before continuing
 
 ## Self-Verification
 
 - [ ] Execution plan created and approved
-- [ ] All tasks executed, reviewed where applicable (max 3 iterations each), decisions.md filled
+- [ ] All tasks executed, reviewed where applicable (max 2 rounds each), decisions.md filled
 - [ ] All waves committed (including Final Wave)
 - [ ] User reviewed and approved

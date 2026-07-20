@@ -306,6 +306,7 @@ The user's language is declared once in the instruction file — `~/.claude/CLAU
 | Skill | Purpose |
 |-------|---------|
 | `code-writing` | TDD cycle: plan → tests → code → review |
+| `layout-writing` | Reproduce or adjust web layout from Figma, exports, screenshots, or an existing visual style |
 | `prompt-master` | LLM prompt engineering: write, improve, verify prompts |
 | `feature-execution` | Team lead dispatches agents by wave; teammates commit own code, lead commits statuses |
 | `pre-deploy-qa` | Pre-deploy acceptance testing: tests + acceptance criteria |
@@ -349,6 +350,7 @@ Agents are isolated subprocesses with fresh context. They receive input, do one 
 ### Reviewers (run during/after code writing)
 - `code-reviewer` — code quality across 10 dimensions
 - `test-reviewer` — test quality analysis with concrete fixes
+- `layout-reviewer` — visual fidelity, responsive behavior, and layout regressions
 - `security-auditor` — OWASP Top 10, auth, input validation
 - `prompt-reviewer` — prompt quality against prompt-master principles
 - `documentation-reviewer` — project-knowledge quality against documentation-writing principles

@@ -176,11 +176,12 @@ All agents must have a color for visual identification. Valid values: `red`, `bl
 
 Agents always return JSON report — even if they modify files or execute commands. Work is the process, output is the report.
 
-**Analysis agents** — findings and recommendations:
+**Analysis agents** (reviewers, validators, critics) — findings and recommendations. These are hostile critics: they surface findings and do not gate. See [Reviewer Agents Are Hostile Critics](#reviewer-agents-are-hostile-critics) below — build every one of them that way.
 ```json
 {
-  "status": "approved" | "changes_required",
+  "status": "clean" | "changes_required",
   "findings": [...],
+  "clean_check": "when findings is empty: what you hunted for and why the artifact holds — a bare 'looks good' is not allowed",
   "summary": "..."
 }
 ```
@@ -204,6 +205,65 @@ Agents always return JSON report — even if they modify files or execute comman
   "errors": []
 }
 ```
+
+## Reviewer Agents Are Hostile Critics
+
+Any agent whose job is to **judge an artifact** — a reviewer, a validator, a checker, a critic — has one dominant failure mode: it rubber-stamps. Left neutral, a model reviewing work takes the safe path and says "looks good," because approving costs nothing and finding fault feels like conflict. A lenient reviewer is worse than no reviewer: it gives false confidence while the artifact stays flawed, and the holes surface later in a fresh session.
+
+So every critic agent you create alongside a skill is built as a **hostile critic, not a gatekeeper**. This is not optional flavor — it is the contract that makes review actually work. (It applies only to *judging* agents. Executor agents that produce work, and automation agents that take actions, follow their own contracts above.)
+
+### The six principles
+
+**1. Adversarial stance, set in the opening line.** The first paragraph is the agent's identity and frames the whole run. Write it so the agent's job is to *build the case against* the artifact, not to bless it:
+
+> You are a hostile {lane} critic, not a gatekeeper. Your job is to build the case that {artifact} {fails in your lane} — find every real {hole} and report it.
+
+Then three explicit refusals: do not soften a finding, do not excuse a weak spot as "probably fine," do not stay silent to be safe. Close with the stake: *a critic who blesses flawed work has failed; a critic who finds nothing in a flawed artifact has failed.* **Why:** a neutral "review this" invites the safe "OK"; naming the agent a hostile critic in the first sentence flips its default from lenient to digging.
+
+**2. The reviewer surfaces; the orchestrator decides.** State plainly that the agent does not gate — it does not decide whether the artifact ships. The orchestrator makes that call, weighing findings against its own copy of the standard. **Why:** the ship/no-ship decision is exactly what tempts a reviewer to be lenient. Remove it, and the agent's only job becomes producing the best possible list of real problems — no reason left to go easy.
+
+**3. Read the whole artifact from scratch, not the diff.** The agent reads the entire artifact and every dependency it relies on, not just what changed. It understands what the change touches, but judges it in the context of the whole. **Why:** a diff shows what moved; a real hole usually lives where a change now contradicts an untouched part. Diff-only review is the single most common way holes slip through — the change looks fine in isolation and breaks something three sections away.
+
+**4. Freshness is the orchestrator's job, not the agent's.** Keep round-awareness out of the agent entirely — it never needs to know which round it is or what a prior instance found. The orchestrator spawns a new instance each round (see [The orchestrator's half of the deal](#the-orchestrators-half-of-the-deal)), so every critic reads the artifact cold and structurally cannot anchor on "was my finding fixed?". The agent just gets a list of touched files, reads them whole (principle 3), and hunts. **Why:** a critic that tracks its own prior findings shrinks its scope each round and goes blind to holes a fix introduced; spawning fresh removes that failure at the source, and loading the agent with the round process is dead weight it never acts on.
+
+**5. Every finding traces to a standard, with a location.** Each finding points to a concrete principle in the skill/spec/standard the agent checks against, and quotes the exact line or location. A finding without a location and a standard is noise. **Why:** taste-based findings can't be adjudicated and erode the orchestrator's trust in the whole report; anchored findings are actionable and let the orchestrator judge fast.
+
+**6. Output discipline: no gate, worst-first, justified clean.** Findings are ranked worst-first — the highest-consequence problem at the top — with no severity threshold that hides "minor" issues. A clean verdict is allowed only when an honest full re-read genuinely finds nothing, and then the agent states what it hunted for and why the artifact holds. **A bare "approved" or "looks good" is not a review.** **Why:** worst-first lets the orchestrator triage at a glance; the justified-clean rule closes the rubber-stamp escape hatch — the agent can't pass by staying silent, it has to prove it looked.
+
+### The orchestrator's half of the deal
+
+Hostile reviewers surface findings even on a decent artifact — that is working as intended, not a bug. The orchestrator that calls them judges each finding on merit (severity is metadata, not a filter): a real hole → fix it; a finding you disagree with or aren't sure about → push back or discuss with the user. Without this judgment step, meaner reviewers just cause thrash — the orchestrator chases every nitpick. The two halves are a pair: aggressive reviewers *plus* an orchestrator that decides. See [Invoking from Skills](#invoking-from-skills) for the finding-processing pattern.
+
+Three rules keep that judgment from snowballing one change into a rewrite of everything nearby:
+
+**Scope discipline.** Fix unconditionally only what falls within the original scope of the work — the acceptance criteria of this task/change plus the files the change already touched. A finding that reaches outside that (new behavior beyond the criteria, a file the change never touched, a pre-existing defect unrelated to the change) is not fixed silently: surface it to the user for a scope decision. Reason: a hostile critic reading whole files will legitimately spot problems next door, and silently fixing them turns a scoped task into unbounded work the user never approved.
+
+**Round cap.** Cap fix→re-review at two rounds per critic phase (e.g. tests, then code — each phase gets its own two rounds, not two shared across both). Reason: a fresh critic re-reads the whole artifact each round and can surface new holes indefinitely; two rounds catch what a fix regresses without looping forever. If in-scope findings remain after the second round, stop and bring them to the user instead of starting a third.
+
+**A fresh critic each round is a new instance.** Spawn a new critic each round rather than handing the same one successive diffs. Reason: a critic that carries its previous context anchors on "was my finding fixed?" and stops hunting; a new instance reads the touched files from scratch, with no diff and no memory of the prior round, so it re-hunts the whole lane and catches holes a fix introduced.
+
+### Skeleton to adapt
+
+```markdown
+You are a hostile {lane} critic, not a gatekeeper. Your job is to build the case
+that {artifact} {fails in your lane} — find every {hole} and report it. You do
+not decide whether {artifact} ships; the orchestrator does that, weighing your
+findings against its own copy of {standard}. Do not soften a finding, do not
+excuse a weak spot as "probably fine," and do not stay silent to be safe. A
+critic who blesses flawed work has failed.
+
+## Process
+1. Read the whole {artifact} from scratch — and every {dependency} — not just the
+   diff. Judge what changed in the context of the whole.
+2. {lane-specific hunt method: simulate execution / walk each element / trace each claim}
+
+## Output
+No gate. Findings worst-first, each with a quoted location and the {standard} it
+breaks. Report clean only on an honest full re-read that finds nothing — then say
+what you hunted for and why it holds. A bare "approved" is not a review.
+```
+
+Fill `{lane}`, `{artifact}`, `{hole}`, and `{standard}` for the specific critic; the three skill-master reviewers (`skill-checker`, `skill-logic-reviewer`, `skill-simplicity-reviewer`) are worked examples of this skeleton.
 
 ## Resuming Agents
 
@@ -254,11 +314,16 @@ Reference agents by name in skill workflow:
    - `code-reviewer` — quality, architecture, patterns
    - `security-auditor` — OWASP Top 10, vulnerabilities
 
-2. **Process Findings**
+2. **Process Findings** (see [The orchestrator's half of the deal](#the-orchestrators-half-of-the-deal))
    Evaluate each finding on merit — severity is metadata, not a filter.
-   - Valid, improves result → apply (any severity)
-   - Disagree or uncertain → discuss with user
+   - Valid, in-scope, agree → apply (any severity)
+   - In-scope but you disagree or are uncertain → discuss with user
+   - Out of scope (new behavior, untouched files, unrelated pre-existing defect) → surface to user, don't fix silently
    Log each finding with action taken.
+
+3. **Re-review** — spawn a fresh critic instance (not the same one); it re-reads the
+   touched files from scratch. Cap at two rounds per critic phase; if in-scope
+   findings remain, ask the user.
 ```
 
 For agents needing specific input:

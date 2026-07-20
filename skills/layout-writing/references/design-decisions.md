@@ -1,0 +1,28 @@
+# Design Decisions from Existing Evidence
+
+Use this reference only for details the supplied source does not define. The skill reproduces and extends a design language; it does not create a new visual identity.
+
+## Evidence Order
+
+Choose unspecified values from the nearest reliable evidence:
+
+1. The exact source frame or state for the element.
+2. The same component in another supplied viewport or state.
+3. Neighboring components on the same page.
+4. Project tokens and established shared components.
+5. General interface conventions.
+
+This order prevents an arbitrary global convention from overriding the visual grammar immediately surrounding the element.
+
+## Coherent Extension
+
+When adding a new block in the existing style, map its roles before choosing values:
+
+- outer container and alignment grid;
+- heading, body, label, and action typography roles;
+- surface, border, text, accent, and muted color roles;
+- standard spacing steps, corner radius, shadows, and control heights;
+- mobile stacking and content priority;
+- interaction and motion patterns already used nearby.
+
+Prefer existing tokens and variants that satisfy the role. If no suitable variant exists, introduce the smallest local value or variant that fits the surrounding pattern.

@@ -120,6 +120,7 @@ For non-code tasks (user instructions, deploy, config): adapt format — checkli
 Tests to write BEFORE implementation, covering all steps in What to do. Format: `tests/path::test_name` — what it verifies.
 Derive from acceptance criteria and tech-spec.
 Conditional: fill for code tasks. For non-code tasks (user instructions, deploy, config) — delete this section.
+Exception: a pure `layout-writing` task uses visual verification from that skill and omits TDD Anchor unless the tech-spec explicitly requires automated tests.
 
 ### 6. Acceptance Criteria
 Checklist of what must work after all steps are done.

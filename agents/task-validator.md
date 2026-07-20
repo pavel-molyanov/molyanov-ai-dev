@@ -113,6 +113,7 @@ Additional:
 - [ ] Every skill from frontmatter `skills` listed here
 - [ ] No skills listed that aren't in frontmatter
 - [ ] Skill matches task content: prompt-authoring tasks should use `prompt-master`, not `code-writing`. Code tasks should use `code-writing`, not `prompt-master`. If the task's primary work is writing/editing prompts but the skill is `code-writing` (or vice versa) → severity `critical`
+- [ ] Pure layout from Figma, Claude Design, screenshots, or an existing visual style uses `layout-writing`, not `code-writing` → severity `critical`
 
 **Verification Steps:**
 - [ ] Each step: what to do + expected result
@@ -152,7 +153,8 @@ Not derivable from sources of truth — inline validation rules.
 - [ ] `frontmatter.reviewers` matches Reviewers section (same set)
 - [ ] Verification Steps section always present (mandatory for all tasks)
 - [ ] Skills ↔ reviewers mapping valid:
-  - `code-writing` → includes `code-reviewer`, `test-reviewer`
+  - `code-writing` → includes `code-reviewer`, `security-auditor`, `test-reviewer`
+  - `layout-writing` → includes `layout-reviewer`
   - `skill-master` → includes `skill-checker`
 
 ### F. Decomposition Quality (cross-task)

@@ -260,6 +260,7 @@ work/{feature}/
 | `security-auditor` | Безопасность по OWASP Top 10: SQL injection, XSS, auth, криптография |
 | `deploy-reviewer` | CI/CD pipeline: GitHub Actions, secrets management, конфигурация деплоя |
 | `infrastructure-reviewer` | Инфраструктура: структура проекта, Docker, pre-commit hooks, .gitignore |
+| `layout-reviewer` | Визуальная точность и адаптивность в сравнении с исходным дизайном или существующим стилем проекта |
 | `prompt-reviewer` | Качество LLM-промптов по принципам prompt-master |
 
 #### QA
@@ -283,6 +284,7 @@ work/{feature}/
 | Skill | Назначение |
 |---|---|
 | `code-writing` | Процесс написания кода: план → тесты → код → ревью |
+| `layout-writing` | Воспроизведение и корректировка веб-вёрстки по Figma, скриншотам, Claude Design или существующему стилю проекта с визуальной проверкой |
 | `feature-execution` | Оркестрация фичи: тимлид создаёт команду агентов, распределяет задачи по волнам |
 | `prompt-master` | Написание, улучшение и проверка промптов для LLM |
 

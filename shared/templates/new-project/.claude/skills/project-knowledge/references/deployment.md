@@ -18,7 +18,7 @@ Deployment process, infrastructure, and production operations for AI agents.
 ## Access Information
 
 **SSH Access:**
-- Production: `ssh user@server-ip` [e.g., `ssh root@123.45.67.89`]
+- Production: `ssh user@server-ip` [e.g., `ssh user@server.example.com`]
 - Staging: [if applicable]
 
 > If not configured, agent will request: server address, username, and port.

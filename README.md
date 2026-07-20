@@ -260,6 +260,7 @@ Agents are isolated subprocesses with their own context. They receive a task, do
 | `security-auditor` | Security against OWASP Top 10: SQL injection, XSS, auth, cryptography |
 | `deploy-reviewer` | CI/CD pipeline: GitHub Actions, secrets management, deploy configuration |
 | `infrastructure-reviewer` | Infrastructure: project structure, Docker, pre-commit hooks, .gitignore |
+| `layout-reviewer` | Visual fidelity and responsive layout against supplied designs or the project's existing style |
 | `prompt-reviewer` | LLM prompt quality against prompt-master principles |
 
 #### QA
@@ -283,6 +284,7 @@ Agents are isolated subprocesses with their own context. They receive a task, do
 | Skill | Purpose |
 |---|---|
 | `code-writing` | The code-writing process: plan → tests → code → review |
+| `layout-writing` | Reproducing and adjusting web layouts from Figma, screenshots, Claude Design, or an existing project style with visual verification |
 | `feature-execution` | Feature orchestration: a team lead creates a team of agents and distributes tasks across waves |
 | `prompt-master` | Writing, improving, and reviewing prompts for LLMs |
 

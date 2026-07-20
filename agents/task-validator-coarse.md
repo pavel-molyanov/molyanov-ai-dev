@@ -120,6 +120,7 @@ Additional:
 - [ ] Every skill from frontmatter `skills` listed here
 - [ ] No skills listed that aren't in frontmatter
 - [ ] Skill matches task content: prompt-authoring tasks should use `prompt-master`, not `code-writing`. Code tasks should use `code-writing`, not `prompt-master`. Mismatch → severity `critical`
+- [ ] Pure layout from Figma, Claude Design, screenshots, or an existing visual style uses `layout-writing`, not `code-writing` → severity `critical`
 
 **Verification Steps:**
 - [ ] Each step: what to do + expected result
@@ -158,7 +159,8 @@ Coarse tasks are not atomic — they cover one skill's cohesive work in the feat
 - [ ] `frontmatter.reviewers` matches Reviewers section (same set)
 - [ ] Verification Steps section always present
 - [ ] Skills ↔ reviewers mapping valid:
-  - `code-writing` → includes `code-reviewer`, `test-reviewer`
+  - `code-writing` → includes `code-reviewer`, `security-auditor`, `test-reviewer`
+  - `layout-writing` → includes `layout-reviewer`
   - `skill-master` → includes `skill-checker`
   - `prompt-master` → includes `prompt-reviewer`
 

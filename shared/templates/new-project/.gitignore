@@ -15,6 +15,10 @@ secrets/
 .claude/settings.local.json
 .codex/settings.local.json
 
+# Portable public MCP templates (root personal MCP configs remain ignored)
+!.mcp.json
+!.mcp.bot.json
+
 # Dependencies
 node_modules/
 venv/

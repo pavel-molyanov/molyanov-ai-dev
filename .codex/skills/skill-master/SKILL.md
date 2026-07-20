@@ -12,42 +12,18 @@ description: |
 
 ## Claude-to-Codex Autosync
 
-Global methodology source of truth is Claude-side: `~/.claude/**`.
-Codex-side `~/.codex/**` is generated runtime.
-
-When changing global methodology files under `~/.claude/skills/**`, `~/.claude/agents/**`, `~/.claude/commands/**`, or `~/.claude/shared/**`, immediately run:
-
-```bash
-~/.claude/scripts/sync-to-codex.sh --apply
-```
-
-If sync reports a conflict or validation error, stop and report it. Include generated `~/.codex/**` changes in the same commit as the `~/.claude/**` source change.
-
-When changing project-local `.claude/**` files inside a project, run project sync instead:
-
-Project source of truth is Claude-side: `CLAUDE.md` and `.claude/**`.
-Codex-side `AGENTS.md` and `.codex/**` is generated runtime.
-
-```bash
-~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply
-```
-
-**Built into framework skills — add it to your own.** Every skill in this framework that edits `.claude/**` already carries an autosync step: it writes the Claude-side source first, then regenerates the Codex runtime (and the `~/.claude` pre-commit hook runs the sync automatically when methodology files are staged). When you author your OWN skill that creates or edits `~/.claude/**` or project `.claude/**` files, paste this block near the top of its `SKILL.md` so your changes reach Codex too:
-
-````markdown
-## Autosync to Codex
-
-This skill edits Claude-side source of truth (`~/.claude/**` for global skills, or a project's `.claude/**`). Codex-side `~/.codex/**` / `AGENTS.md` is generated runtime. After editing those files, regenerate Codex:
+Claude-side is the source of truth (`~/.claude/**` for global methodology, or a project's `CLAUDE.md` + `.claude/**`); Codex-side (`~/.codex/**` / `AGENTS.md`) is generated runtime. After editing any `.claude/**` methodology file (`skills/`, `agents/`, `commands/`, `shared/`), regenerate Codex:
 
 ```bash
 ~/.claude/scripts/sync-to-codex.sh --apply                   # global ~/.claude/**
 ~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply  # project .claude/**
 ```
 
-Commit the generated `.codex/**` / `AGENTS.md` changes together with the source. If sync reports a conflict, stop and report it.
-````
+Commit the generated `.codex/**` / `AGENTS.md` changes together with the source. If sync reports a conflict or validation error, stop and report it.
 
-If a skill never touches `.claude/**` (pure analysis, code-writing in a project's own source tree), it does not need an autosync block.
+**Authoring a skill that edits `.claude/**`?** Paste the block above near the top of its `SKILL.md` so its changes reach Codex too. A skill that never touches `.claude/**` (pure analysis, code-writing in a project's own source tree) does not need it.
+
+**Bundled resources and the sync:** Markdown files (`SKILL.md`, `references/*.md`) are text-adapted during sync (Claude tool names → Codex equivalents). Every other bundled file — `scripts/`, `assets/`, images, data — is copied **byte-for-byte, unmodified**. So a bundled script must be **runtime-agnostic**: don't hardcode `.claude` paths or Claude-only tool names, since neither is rewritten in the Codex copy. Reference files relative to the script's own location, and let the surrounding `SKILL.md` prose (which *is* adapted) carry any runtime-specific instructions.
 
 ## About Skills
 
@@ -182,6 +158,20 @@ description: |
   ask for a "dashboard".
 ```
 
+#### Negative Triggers
+
+Pushiness fixes undertriggering, but it causes the opposite problem — the skill fires on near-misses that share keywords but need something else. Add an explicit "do not use for" line so Claude can rule the skill out.
+
+```yaml
+description: |
+  Analyze SQL query performance and suggest index changes.
+
+  Use when: "why is this query slow", "optimize this SELECT", "add an index"
+  Do NOT use for: writing new queries from scratch, schema design, data migrations.
+```
+
+The negative line matters most when a nearby skill exists that should win instead. Name the adjacent domain so Claude routes correctly.
+
 **Need argument-hint, disable-model-invocation, or model override?** Read [frontmatter-options.md](references/frontmatter-options.md) — optional fields and when to use each.
 
 ### Body
@@ -201,15 +191,22 @@ A skill contains only SKILL.md and these three optional directories — nothing 
 
 #### Scripts (`scripts/`)
 
-Executable code (Python/Bash/etc.) for tasks that require deterministic reliability or are repeatedly rewritten.
+Executable code (Python/Bash/etc.) for **deterministic mechanical work** — the kind of thing a model should not be redoing by hand each run.
 
-- **When to include**: When the same code is being rewritten repeatedly or deterministic reliability is needed
-- **Example**: `scripts/rotate_pdf.py` for PDF rotation tasks
+**Scripts are for:**
+- Math and counting (totals, aggregations, precise arithmetic)
+- Data transfer and transformation (parse a file, reshape data, convert formats)
+- Unpacking or scaffolding templates (copy an asset tree, fill placeholders)
+- Any deterministic operation that gets rewritten identically on every invocation
+
+**Scripts are NOT for:** validating the skill's own output, enforcing rules, or "checking" work. A smart model does that kind of judgment better and cheaper than a brittle script full of special cases. If you catch yourself writing a `validate_*.py` or a checker that hard-codes rules, that is usually over-engineering — the check belongs in prose the model reads, or in a reviewer subagent. Bundle a script to *do* mechanical work, not to *police* it.
+
 - **Benefits**: Token efficient, deterministic, may be executed without loading into context
+- **Solve, don't punt**: a bundled script should handle its own errors, not fail and leave the model to cope. State the intent explicitly — "Run `x.py`" (execute) vs "See `x.py`" (read as reference).
 - **Note**: Scripts may still need to be read by Claude for patching or environment-specific adjustments
 
 **Concrete example:** When building a `pdf-editor` skill for queries like "Help me rotate this PDF":
-1. Rotating a PDF requires re-writing the same code each time
+1. Rotating a PDF requires re-writing the same deterministic code each time
 2. A `scripts/rotate_pdf.py` script solves this — write once, execute many times
 
 **How to spot script candidates:** After running test cases, read the transcripts. If all test runs independently wrote similar helper code (e.g., each created a `create_docx.py`), that's a strong signal to bundle that script. Write once, use on every invocation.
@@ -468,24 +465,11 @@ If skill has context-heavy tasks (reviews, research, validation):
 
 **Delegating work to subagent?** Read [agents.md](references/agents.md) — inline prompts, dedicated agents, output contracts.
 
+**Creating a reviewer, validator, or critic subagent?** Build it as a hostile critic, not a gatekeeper — a reviewer left neutral rubber-stamps, and a rubber-stamping reviewer is worse than none (false confidence while the skill stays flawed). Follow the required stance and output contract in [agents.md → Reviewer Agents Are Hostile Critics](references/agents.md).
+
 **Checkpoint:** Writing guidelines applied. Skill is concise, well-structured, references linked properly.
 
 ## 4. Validation
-
-### Run skill-checker
-
-After self-check — run validation:
-
-```
-Use skill-checker subagent to validate the skill at {path}.
-If issues found → fix them → run skill-checker again.
-```
-
-skill-checker is defined in `~/.claude/agents/skill-checker.md` and has skill-master preloaded.
-
-### Test the Skill
-
-After creating or significantly updating a skill, suggest to the user to run skill-tester on it. skill-tester will design test cases, run them with and without the skill, test description triggering accuracy, and produce a report with specific improvement recommendations.
 
 ### Self-Check Before Validation
 
@@ -514,4 +498,30 @@ After creating or significantly updating a skill, suggest to the user to run ski
 - [ ] No forced sequential structure
 
 **Functional (all skills):**
-- [ ] Run skill-checker and fix all issues
+- [ ] Run skill-checker (form), skill-logic-reviewer (logic), skill-simplicity-reviewer (simplicity) — fix or discuss every finding
+
+### Run the three reviewers
+
+After self-check — run validation. Three reviewers attack the skill from different angles, on fresh context. Each is a hostile critic (see [agents.md → Reviewer Agents Are Hostile Critics](references/agents.md)): its job is to build the case against the skill, not to bless it. Launch them in parallel:
+
+- `skill-checker` — **form**: hunts every broken rule — frontmatter, line limits, link style, emphasis words, missing referenced files.
+- `skill-logic-reviewer` — **logic**: simulates executing the skill and hunts every gap, ambiguity, contradiction, and unhandled branch where an agent would get stuck or guess.
+- `skill-simplicity-reviewer` — **simplicity**: challenges every rule, script, phase, and reference, hunting dead weight and over-engineering — is it justified, or is there a simpler, more reliable way?
+
+```
+Run in parallel on the skill at {path}:
+  skill-checker, skill-logic-reviewer, skill-simplicity-reviewer.
+They dig hard and will surface findings even on a decent skill — that is the job,
+not noise. Weigh each on merit (severity is metadata, not a filter): in-scope hole →
+fix; disagree or unsure → discuss with the user; finding outside this change's scope →
+surface to the user, don't fix silently. After fixing, spawn a fresh reviewer instance
+(not the same one) — it re-reads the whole skill and hunts new holes, including any a
+fix introduced. Cap at two rounds; if findings remain, ask the user. (See [agents.md →
+The orchestrator's half of the deal](references/agents.md).)
+```
+
+All three are defined under `~/.claude/agents/` and have skill-master preloaded.
+
+### Test the Skill
+
+After creating or significantly updating a skill, suggest to the user to run skill-tester on it. skill-tester will design test cases, run them with and without the skill, test description triggering accuracy, and produce a report with specific improvement recommendations.

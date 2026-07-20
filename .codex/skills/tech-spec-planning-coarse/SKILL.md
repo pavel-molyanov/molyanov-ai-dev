@@ -84,9 +84,10 @@ Analyze if additional information is needed based on user-spec and code research
 4. **Coarse decomposition rule:** fill Implementation Tasks by grouping related work into skill-scoped tasks.
 
    **How to decompose:**
-   - Start from the list of execution skills needed (from [skills-and-reviewers.md](~/.claude/skills/tech-spec-planning/references/skills-and-reviewers.md)): `code-writing`, `prompt-master`, `skill-master`, `infrastructure-setup`, `deploy-pipeline`.
+   - Start from the list of execution skills needed (from [skills-and-reviewers.md](~/.claude/skills/tech-spec-planning/references/skills-and-reviewers.md)): `code-writing`, `layout-writing`, `prompt-master`, `skill-master`, `infrastructure-setup`, `deploy-pipeline`.
    - **Group into one task:** work that shares a skill AND (same module OR shared files OR logical dependency). All ingestion code → one `code-writing` task. All system prompts for one pipeline → one `prompt-master` task.
    - **Split into separate tasks:** independent modules within the same skill (enables parallel execution in the same wave). Backend ingest + frontend dashboard → two `code-writing` tasks when each owns a separate set of files and can proceed in parallel.
+   - **Layout ownership:** pure layout is its own one-skill `layout-writing` task. Planned mixed layout + business-logic scope splits into linked `layout-writing` and `code-writing` tasks.
    - **Different implementation skills → usually different tasks.** Code and prompts never mix in one task unless the prompt text has already been explicitly agreed in the tech-spec/user discussion and the remaining work is only ordinary code assembly of fixed prompt strings.
    - **Do not create a standalone Project Knowledge / documentation-writing implementation task.** Project documentation is updated later by the feature-closing documentation command after implementation, audits, deploy, and verification are complete. If documentation is relevant, mention it in release/final notes, not as an implementation task.
    - Aim for 3-7 implementation tasks (plus final audit/QA/deploy waves).

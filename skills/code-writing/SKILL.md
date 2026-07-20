@@ -6,6 +6,10 @@ description: |
 
   Use when: "напиши код", "закодь", "реализуй", "write code", "implement"
 
+  Do NOT use for pure layout from Figma, Claude Design, screenshots, or an existing visual
+  style ("сверстай", "подвинь блок", responsive) — use layout-writing instead.
+  Direct mixed layout + business-logic work uses both layout-writing and code-writing.
+
   For planning tasks → tech-spec-planning skill. For specs → user-spec-planning skill.
 ---
 
@@ -58,13 +62,30 @@ description: |
    - One test = one scenario, test behavior not implementation
    - If mocking >3 dependencies → wrong test type, use integration test
 
-2. **Write Code**
+2. **Critique Tests** (before writing code)
+
+   Spawn a fresh `test-reviewer` in `design` mode. No implementation exists yet, so it
+   attacks test design (behavior-not-implementation, edge/error coverage, meaningful
+   assertions, right test type) rather than the litmus test, which needs running code.
+   Pass: paths to the test files you wrote + acceptance criteria.
+   Report path: `logs/working/task-{N}/test-reviewer-design-{round}.json`
+   (`{N}` = task number, `"standalone"` if no task file). This phase's 2-round cap is
+   independent of the Phase 3 code-review cap — each critic phase gets its own two rounds.
+
+   Process findings by the Phase 3 "Process Findings" rules (in-scope fix / disagree →
+   discuss / out-of-scope → surface to user). Strengthen the tests, then spawn a **new**
+   `test-reviewer` for the next round — a fresh instance, not the same one.
+   Limit: 2 rounds. If in-scope findings remain after round 2 → ask the user before
+   writing code. Reason: catching a hollow test now is cheaper than discovering after
+   the code is built that the tests never protected it.
+
+3. **Write Code**
    - Implement to pass tests
    - Follow project patterns (from Phase 1) or apply baseline from [universal-patterns.md](references/universal-patterns.md)
    - Use env vars for secrets, validate inputs at boundaries
    - Handle edge cases, comment WHY not WHAT
 
-3. **Run Tests**
+4. **Run Tests**
    - All new tests pass
    - Fix any failures
 
@@ -97,13 +118,17 @@ description: |
 
    For each reviewer:
    1. Spawn subagent via Task tool (subagent_type = reviewer name, e.g. `code-reviewer`)
-   2. Pass: git diff of changes, path to task file, path to tech-spec, path to user-spec
+   2. Pass: paths to all files this change touched (the reviewer reads them in full,
+      not a diff — a hole usually lives where a change contradicts an untouched part),
+      path to task file, path to tech-spec, path to user-spec. For `test-reviewer` use
+      `full` mode here (code exists, so the litmus test applies).
    3. Reviewer loads its own skill automatically (via agent frontmatter `skills:`)
    4. Report path: from the task's "Reviewers" section (or `logs/working/` if standalone)
 
    Reviewers write JSON reports to `logs/working/task-{N}/{reviewer-name}-{round}.json`.
    `{N}` = task number from task file; `"standalone"` if no task file.
-   On re-review: new file with incremented round number, old file stays.
+   On re-review: spawn a **fresh** reviewer instance (not the same one) — it re-reads the
+   touched files from scratch. Write a new file with an incremented round number.
 
 5. **Process Findings**
 
@@ -111,18 +136,22 @@ description: |
    A valid minor fix still improves quality. Reason: skipping valid findings
    silently degrades the codebase over time.
 
-   For each finding:
-   - **Valid, improves code** → apply (any severity: critical, major, minor, low)
-   - **Disagree or uncertain** → discuss with user (explain reasoning)
-   - **Out of scope** → skip, note in findings log
+   Scope: in-scope = this task's acceptance criteria + files this change touched.
+   Out-of-scope = anything beyond that (new behavior, untouched files, an unrelated
+   pre-existing defect). For each finding:
+   - **Valid, in-scope, agree** → apply (any severity: critical, major, minor, low)
+   - **In-scope but you disagree or are uncertain** → discuss with user (explain reasoning)
+   - **Out of scope** → surface to user, don't fix silently — the user decides whether
+     it's worth expanding the work
 
    Produce a findings log:
    | # | Source | Severity | Finding | Action | Reason |
    Each finding appears in this table — transparent decision trail.
 
-   After applying fixes → re-run tests → re-run the reviewer(s) that reported them.
-   Limit: 3 review iterations. If findings remain after round 3 → ask user.
-   Reason: fixes can introduce new issues — a second pass catches regressions.
+   After applying fixes → re-run tests → spawn a fresh reviewer instance for the next round.
+   Limit: 2 review rounds. If in-scope findings remain after round 2 → ask user.
+   Reason: fixes can introduce new issues — a second pass catches regressions; beyond two
+   rounds the remaining findings need human judgment, not another loop.
 
 **Checkpoint:** List post-work steps completed.
 

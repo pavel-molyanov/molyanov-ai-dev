@@ -43,22 +43,29 @@ Execute a spec-driven task with validation and status tracking.
 1. Load each skill listed in the task (frontmatter `skills: [...]` and "Required Skills" section)
    - If a skill is not found → warn user, continue with remaining skills
    - If task has no skill (frontmatter `skills: []` or absent) → read the task, execute "What to do" and "Verification Steps" directly. For tasks with user instructions → show the instruction to user, wait for confirmation.
-2. Follow loaded skill workflow
+2. Follow loaded skill workflow. The loaded skill owns the review loop (e.g. code-writing
+   runs the test critique and code reviews itself) — do not run reviewers again here.
 3. Git commit implementation (code + tests pass): `feat|fix|refactor: task {N} — {brief description}`
-4. For each reviewer from the task's "Reviewers" section (if present):
-   1. Spawn subagent via spawn_agent (subagent_type = reviewer name, e.g. `code-reviewer`)
-   2. Pass: git diff of changes, path to task file, path to tech-spec, path to user-spec
-   3. Reviewer loads its own skill automatically (via agent frontmatter `skills:`)
-   4. Report is written to the path specified in the task's "Reviewers" section, resolved relative to the feature directory (e.g., `logs/working/task-1/...` → `{feature_dir}/logs/working/task-1/...`)
-   5. Read report. If findings exist → fix, re-run tests, git commit: `fix: address review round {N} for task {N}`, repeat (max 3 rounds)
+4. **Skill-less tasks only** (frontmatter `skills: []` or absent): no skill owns reviews,
+   so run the task's "Reviewers" section here, following the policy in
+   `~/.claude/skills/skill-master/references/agents.md` → The orchestrator's half of the deal:
+   1. For each reviewer, spawn a subagent via spawn_agent (subagent_type = reviewer name)
+   2. Pass: paths to all files this change touched (reviewer reads them in full, not a diff),
+      path to task file, tech-spec, user-spec
+   3. Report → the path in the task's "Reviewers" section, resolved under `{feature_dir}`
+      (e.g. `logs/working/task-1/...` → `{feature_dir}/logs/working/task-1/...`)
+   4. Process findings: in-scope fix / disagree → discuss / out-of-scope → surface to user.
+      Fix, re-run tests, git commit `fix: address review round {R} for task {N}`, then spawn a
+      **fresh** reviewer for the next round. Max 2 rounds; in-scope findings remaining after
+      round 2 → ask user.
 
 ## Step 3: Verify
 
 1. Check each acceptance criterion from task file
 2. If task has "Verification Steps → Smoke" → execute each smoke command, record results in decisions.md Verification section
 3. If task has "Verification Steps → User" → ask user to verify, wait for confirmation
-4. If any verification fails → fix → re-run tests → re-run reviewers (new round) → re-verify
-   - After 3 failed rounds → stop, report failures to user, keep status `in_progress`
+4. If any verification fails → fix → re-run tests → spawn fresh reviewers (new round) → re-verify
+   - After 2 failed rounds → stop, report failures to user, keep status `in_progress`
    - Tool unavailable → document, suggest manual check
 
 ## Step 4: Complete

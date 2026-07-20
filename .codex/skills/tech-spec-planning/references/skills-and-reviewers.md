@@ -9,6 +9,7 @@ Used by: tech-spec-planning (Phase 4), task-decomposition (Phase 1).
 | Skill | What it's for | Typical tasks |
 |-------|--------------|---------------|
 | `code-writing` | Writing/modifying code, TDD cycle | API endpoints, models, services, components, migrations, tests |
+| `layout-writing` | Reproducing or adjusting web layout from a visual source or existing style | Figma, Claude Design exports, screenshots, responsive layout, moving a block |
 | `infrastructure-setup` | Framework init, folder structure, Docker, pre-commit hooks, testing setup | Dockerfile, pre-commit hooks, folder structure, .gitignore, smoke tests |
 | `deploy-pipeline` | CI/CD pipelines, deployment config, automated deploy | GitHub Actions, deploy scripts, platform config, secrets management |
 | `documentation-writing` | Documentation, Project Knowledge updates | Architecture docs, API docs, conventions, patterns |
@@ -25,6 +26,15 @@ Tasks without skill (user instructions) — skill not specified, description is 
 
 Prompt tasks (LLM system prompts, user templates) use `prompt-master` skill — they are NOT code-writing tasks. TDD Anchor is replaced by manual verification on sample data.
 
+Layout routing:
+- Pure layout uses `layout-writing`, not `code-writing`.
+- Planned mixed layout + business-logic scope splits into linked one-skill `layout-writing` and `code-writing` tasks.
+- Direct or ad-hoc mixed layout + business-logic work can load both skills.
+- Logic-only work uses `code-writing`.
+- Blank-slate visual design is outside `layout-writing`; agree on a design source first.
+
+Every task using `layout-writing`, including micro-adjustments, includes `layout-reviewer`.
+
 ## Reviewer Agents
 
 | Agent | What it checks | Model |
@@ -32,6 +42,7 @@ Prompt tasks (LLM system prompts, user templates) use `prompt-master` skill — 
 | `code-reviewer` | Code quality: structure, patterns, naming, complexity, error handling | sonnet |
 | `security-auditor` | OWASP Top 10, injection, XSS, auth, input validation, secrets | sonnet |
 | `test-reviewer` | Test quality: coverage, meaningful assertions, test pyramid balance | sonnet |
+| `layout-reviewer` | Visual fidelity, responsive behavior, and layout regressions | sonnet |
 | `skill-checker` | Skill compliance: frontmatter, structure, skill-master guidelines | sonnet |
 | `prompt-reviewer` | Prompt quality: clarity, positive framing, examples over rules, compression, XML structure, success criteria | sonnet |
 | `infrastructure-reviewer` | Infrastructure setup quality: folder structure, pre-commit, Docker, .gitignore, testing | sonnet |
@@ -42,6 +53,7 @@ Prompt tasks (LLM system prompts, user templates) use `prompt-master` skill — 
 | Skill | Default reviewers |
 |-------|------------------|
 | `code-writing` | `code-reviewer`, `security-auditor`, `test-reviewer` |
+| `layout-writing` | `layout-reviewer` |
 | `infrastructure-setup` | `code-reviewer`, `security-auditor`, `infrastructure-reviewer` |
 | `deploy-pipeline` | `code-reviewer`, `security-auditor`, `deploy-reviewer` |
 | `documentation-writing` | `code-reviewer` |
@@ -61,6 +73,12 @@ When `reviewers` field is empty in a task — fall back to the default set for t
 ```yaml
 skills: [code-writing]
 reviewers: [code-reviewer, security-auditor, test-reviewer]
+```
+
+### Pure layout task
+```yaml
+skills: [layout-writing]
+reviewers: [layout-reviewer]
 ```
 
 ### Infrastructure setup task

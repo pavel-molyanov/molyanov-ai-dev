@@ -108,8 +108,10 @@ Read `~/.claude/skills/tech-spec-planning/references/skills-and-reviewers.md` fo
 
 ### 8a. Skill Correctness
 
-- Each task's Skill value must match an entry from the Execution Skills table (`code-writing`, `infrastructure-setup`, `deploy-pipeline`, `documentation-writing`, `skill-master`, `pre-deploy-qa`, `post-deploy-qa`, `prompt-master`). Unknown skill → critical finding.
+- Each task's Skill value must match an entry from the Execution Skills table (`code-writing`, `layout-writing`, `infrastructure-setup`, `deploy-pipeline`, `documentation-writing`, `skill-master`, `pre-deploy-qa`, `post-deploy-qa`, `prompt-master`). Unknown skill → critical finding.
 - If a task description mentions writing or modifying LLM prompts (keywords: "prompt", "system prompt", "LLM prompt", "few-shot", "prompt template") but the task uses `code-writing` skill → critical finding: "Prompt task should use `prompt-master` skill, not `code-writing`."
+- If a task is pure layout from Figma, Claude Design, a screenshot, or an existing visual style but uses `code-writing` instead of `layout-writing` → critical finding: "Pure layout task should use `layout-writing`, not `code-writing`."
+- If a task uses `layout-writing` but omits `layout-reviewer` → critical finding: "Every layout-writing task, including a micro-adjustment, requires layout-reviewer."
 - If task Reviewers include agents not in the Reviewer Agents table → minor: "Reviewer `{name}` not in the standard catalog. Verify it exists."
 
 ### 8b. Task Content (coarse variant)
