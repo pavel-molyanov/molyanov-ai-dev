@@ -12,6 +12,8 @@ projects-registry.json
 projects.md
 project-ideas.md
 backlog.md
+!skills/project-initialization/assets/new-project/backlog.md
+!.codex/skills/project-initialization/assets/new-project/backlog.md
 history.jsonl
 todos/
 plans/
@@ -34,4 +36,10 @@ tmp/
 
 # Local settings
 settings.json
+!skills/project-initialization/assets/new-project/.claude/settings.json
+!.codex/skills/project-initialization/assets/new-project/.claude/settings.json
 settings.local.json
+
+# Host-local Codex sync state, including preserved old* trees
+**/.codex/.sync/
+.codex/config.toml

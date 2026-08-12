@@ -20,6 +20,19 @@ const MUTATION_QUIET_MS = 500
 const QUIET_TIMEOUT_MS = 1_500
 const NETWORK_QUIET_MS = 200
 
+function createOutputTarget(path) {
+  const outDir = resolve(path)
+  try {
+    mkdirSync(outDir)
+  } catch (error) {
+    if (error.code === 'EEXIST') {
+      throw new Error(`output target already exists: ${outDir}`)
+    }
+    throw new Error(`cannot create output target ${outDir}: ${error.message}`)
+  }
+  return outDir
+}
+
 function readHttpCredentials(userEnvName, passwordEnvName) {
   if (!userEnvName && !passwordEnvName) return undefined
   if (!userEnvName || !passwordEnvName) {
@@ -408,7 +421,7 @@ async function main() {
   const { values } = parseArgs({
     options: {
       url: { type: 'string' },
-      out: { type: 'string', default: 'layout-evidence/captures' },
+      out: { type: 'string' },
       label: { type: 'string', default: 'page' },
       'project-root': { type: 'string', default: process.cwd() },
       viewports: { type: 'string' },
@@ -422,8 +435,8 @@ async function main() {
     },
   })
 
-  if (!values.url) {
-    throw new Error('usage: capture.mjs --url <url> --project-root <repo> [options]')
+  if (!values.url || !values.viewports || !values.out) {
+    throw new Error('usage: capture.mjs --url <url> --project-root <repo> --viewports <WIDTHxHEIGHT,...> --out <new-path> [options]')
   }
   const parsedUrl = new URL(values.url)
   if (!['http:', 'https:', 'file:', 'data:'].includes(parsedUrl.protocol)) {
@@ -438,14 +451,13 @@ async function main() {
   const viewports = parseViewportList(values.viewports)
   const expectedFonts = (values['expect-font'] || []).map(parseExpectedFont)
   const allowedFallbacks = values['allow-font'] || []
+  const outDir = createOutputTarget(values.out)
   const playwright = loadPlaywright(values['project-root'])
   const browserType = playwright[values.browser]
   if (!browserType || !['chromium', 'webkit', 'firefox'].includes(values.browser)) {
     throw new Error('--browser must be chromium, webkit, or firefox')
   }
 
-  const outDir = resolve(values.out)
-  mkdirSync(outDir, { recursive: true })
   const browser = await browserType.launch()
   const report = []
 

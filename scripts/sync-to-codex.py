@@ -20,8 +20,6 @@ from pathlib import Path
 
 VERSION = "1"
 MANIFEST_REL = Path(".sync/claude-to-codex-manifest.json")
-TEMPLATE_REL = Path("shared/templates/new-project")
-SCRIPT_REL = Path("scripts/create-backlog.py")
 LOCK_REL = Path(".sync/claude-to-codex.lock")
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,80}$")
 
@@ -160,8 +158,9 @@ def safe_relative(path: Path, root: Path) -> Path:
 
 def reject_protected_path(path: Path) -> None:
     if path.as_posix() in {
-        "shared/templates/new-project/.mcp.bot.json",
-        "shared/templates/new-project/.mcp.json",
+        "skills/project-initialization/assets/new-project/.claude/settings.json",
+        "skills/project-initialization/assets/new-project/.mcp.bot.json",
+        "skills/project-initialization/assets/new-project/.mcp.json",
     }:
         return
     lowered_parts = {part.lower() for part in path.parts}
@@ -265,7 +264,7 @@ def lexical_relative(path: Path, root: Path) -> Path:
     return rel
 
 
-def validate_target(path: Path, root: Path, allow_template_stale: bool = False, symlink_leaf: bool = False) -> None:
+def validate_target(path: Path, root: Path, symlink_leaf: bool = False) -> None:
     if symlink_leaf:
         rel = lexical_relative(path, root)
     else:
@@ -277,18 +276,13 @@ def validate_target(path: Path, root: Path, allow_template_stale: bool = False, 
         or rel.parts[:1] == ("skills",)
         or rel.parts[:1] == ("agents",)
         or rel.parts[:1] == ("commands",)
-        or rel.parts[:3] == ("shared", "templates", "new-project")
-        or rel == SCRIPT_REL
         or rel.parts[:1] == (".sync",)
     )
     if not allowed:
         raise ProtectedPathError(f"target outside allowlist: {path}")
-    protected_check = rel
     if rel.parts[:1] == (".sync",):
         return
-    if allow_template_stale and rel.parts[:3] == ("shared", "templates", "new-project"):
-        return
-    reject_protected_path(protected_check)
+    reject_protected_path(rel)
 
 
 def validate_project_root(project_root: Path, allow_outside_root: bool = False) -> None:
@@ -345,11 +339,11 @@ def lock_path(config: SyncConfig) -> Path:
     return config.codex_root / LOCK_REL
 
 
-def validate_any_target(path: Path, config: SyncConfig, allow_template_stale: bool = False, symlink_leaf: bool = False) -> None:
+def validate_any_target(path: Path, config: SyncConfig, symlink_leaf: bool = False) -> None:
     if config.project_root is not None:
         validate_project_target(path, config.project_root, symlink_leaf=symlink_leaf)
     else:
-        validate_target(path, config.codex_root, allow_template_stale=allow_template_stale, symlink_leaf=symlink_leaf)
+        validate_target(path, config.codex_root, symlink_leaf=symlink_leaf)
 
 
 def add_header(content: str, source: Path) -> str:
@@ -394,7 +388,7 @@ def adapt_common_text(text: str) -> str:
     return text
 
 
-def adapt_tool_terms(text: str) -> str:
+def _replace_tool_terms(text: str) -> str:
     replacements = [
         ("TodoWrite", "update_plan"),
         ("TaskCreate", "spawn_agent"),
@@ -405,6 +399,20 @@ def adapt_tool_terms(text: str) -> str:
     for old, new in replacements:
         text = text.replace(old, new)
     return text
+
+
+def adapt_tool_terms(text: str, *, preserve_markdown_code: bool = False) -> str:
+    if not preserve_markdown_code:
+        return _replace_tool_terms(text)
+    code_pattern = re.compile(r"(?P<ticks>`+).*?(?P=ticks)", re.DOTALL)
+    parts: list[str] = []
+    cursor = 0
+    for match in code_pattern.finditer(text):
+        parts.append(_replace_tool_terms(text[cursor : match.start()]))
+        parts.append(match.group(0))
+        cursor = match.end()
+    parts.append(_replace_tool_terms(text[cursor:]))
+    return "".join(parts)
 
 
 def strip_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
@@ -491,6 +499,8 @@ def frontmatter_list(value: str | list[str] | None) -> list[str]:
         return []
     if isinstance(value, list):
         return [token.strip() for token in value if token.strip()]
+    if re.fullmatch(r"\[\s*\]", value.strip()):
+        return []
     return [token.strip() for token in value.split(",") if token.strip()]
 
 
@@ -624,38 +634,12 @@ def assert_no_operational_leftovers(content: str, target: Path) -> None:
             raise SyncError(f"operational Claude leftover {token!r} in {target}")
 
 
-def template_target_rel(source_rel: Path) -> Path | None:
-    parts = list(source_rel.parts)
-    if parts == ["CLAUDE.md"]:
-        return Path("AGENTS.md")
-    if parts[:1] == [".claude"]:
-        if source_rel.name.startswith("settings") and source_rel.suffix == ".json":
-            return None
-        parts[0] = ".codex"
-    return Path(*parts)
-
-
-def template_codex_target_rel(source_rel: Path) -> Path | None:
-    parts = list(source_rel.parts)
-    if parts == ["CLAUDE.md"]:
-        return Path("AGENTS.md")
-    if parts[:1] == [".claude"]:
-        if source_rel.name.startswith("settings") and source_rel.suffix == ".json":
-            return None
-        parts[0] = ".codex"
-        return Path(*parts)
-    return None
-
-
-def adapt_template_file(source: Path, source_root: Path) -> str:
-    text = adapt_common_text(read_text_source(source, source_root))
-    if source.suffix == ".md":
-        return add_generated_header(text, "<!--", "-->")
-    return text
-
-
 def adapt_skill_file(source: Path, source_root: Path) -> str:
-    text = adapt_tool_terms(read_text_source(source, source_root))
+    is_reference = "references" in source.relative_to(source_root).parts
+    text = adapt_tool_terms(
+        read_text_source(source, source_root),
+        preserve_markdown_code=is_reference,
+    )
     if source.name == "SKILL.md":
         validate_skill_frontmatter(text, source)
     if source.suffix == ".md":
@@ -669,15 +653,19 @@ def make_skill_file_item(
     target: Path,
     adapter: str,
     manifest_targets: dict[str, str],
+    skill_relative: Path,
 ) -> PlanItem:
     """Build a plan item for one skill file (validated target supplied by caller).
 
-    Markdown is text-adapted (tool terms, header, frontmatter check). Any other
-    file — scripts, images, data — is copied byte-for-byte with its executable
-    bit preserved, so binary assets don't crash the sync and scripts aren't
-    mangled by tool-term substitution.
+    SKILL.md and references/*.md are text-adapted. Bundled scripts and assets,
+    including Markdown templates under assets/, are copied byte-for-byte with
+    their executable bit preserved, so runtime resources are not mangled.
     """
-    if source.suffix.lower() == ".md":
+    is_instruction_markdown = (
+        skill_relative == Path("SKILL.md")
+        or skill_relative.parts[:1] == ("references",)
+    )
+    if source.suffix.lower() == ".md" and is_instruction_markdown:
         content = adapt_skill_file(source, read_root)
         return PlanItem(
             action=classify_managed_write(target, content, manifest_targets),
@@ -688,8 +676,11 @@ def make_skill_file_item(
         )
     data = read_binary_source(source, read_root)
     mode = 0o755 if source.stat().st_mode & 0o111 else 0o644
+    action = classify_managed_write_bytes(target, data, manifest_targets)
+    if action == "skip unchanged" and target.stat().st_mode & 0o777 != mode:
+        action = "update"
     return PlanItem(
-        action=classify_managed_write_bytes(target, data, manifest_targets),
+        action=action,
         source=source,
         target=target,
         adapter=adapter,
@@ -698,41 +689,13 @@ def make_skill_file_item(
     )
 
 
-def adapt_create_backlog(source: Path, source_root: Path) -> str:
-    original = read_text_source(source, source_root)
-    text = adapt_common_text(original)
-    text = text.replace("Create a vault backlog for a new project.", "Create a vault backlog for a new project instructions file.")
-    text = text.replace("Adds Backlog: line to the project's AGENTS.md", "Adds Backlog: line to the project's instructions file")
-    text = text.replace("--claude-md ./AGENTS.md", "--instructions-md ./AGENTS.md")
-    text = text.replace(
-        'def update_claude_md(claude_md_path: str, slug: str) -> None:\n    """Add Backlog: line to the project\'s AGENTS.md."""\n    path = Path(claude_md_path).resolve()\n    if not path.exists():\n        print(f"AGENTS.md not found: {path}")\n        return',
-        'def update_instructions_md(instructions_md_path: str, slug: str) -> None:\n    """Add Backlog: line to the project\'s instructions file."""\n    path = Path(instructions_md_path).resolve()\n    if not path.exists():\n        print(f"Instructions file not found: {path}")\n        return',
-    )
-    text = text.replace("update_claude_md", "update_instructions_md")
-    text = text.replace(
-        '    parser.add_argument("--claude-md", required=True, help="Path to project\'s AGENTS.md")\n    args = parser.parse_args()',
-        '    parser.add_argument("--instructions-md", help="Path to project instructions file, usually AGENTS.md")\n'
-        '    parser.add_argument("--claude-md", dest="claude_md", help="Deprecated alias for --instructions-md")\n'
-        "    args = parser.parse_args()\n"
-        "    if not args.instructions_md:\n"
-        "        args.instructions_md = args.claude_md\n"
-        "        if args.instructions_md:\n"
-        '            print("Warning: --claude-md is deprecated; use --instructions-md.", file=sys.stderr)\n'
-        "    if not args.instructions_md:\n"
-        '        parser.error("--instructions-md is required (or deprecated --claude-md)")',
-    )
-    text = text.replace("update_instructions_md(args.codex_md, args.slug)", "update_instructions_md(args.instructions_md, args.slug)")
-    text = text.replace("update_instructions_md(args.claude_md, args.slug)", "update_instructions_md(args.instructions_md, args.slug)")
-    return add_header(text, source)
-
-
 def source_name(path: Path) -> str:
     validate_slug(path.stem)
     return path.stem
 
 
 def is_syncable_file(rel: Path) -> bool:
-    """Whether a skill/template file should be synced.
+    """Whether an allowlisted source file should be synced.
 
     Compiled Python bytecode under `__pycache__` is regenerable build output, not
     source, and is binary so it cannot be read as UTF-8 text. Skipping it keeps the
@@ -890,51 +853,9 @@ def make_agent_item(
     )
 
 
-def inject_init_project_asserts(text: str) -> str:
-    old_codex = "After copy:\n- Verify `.codex/skills/project-knowledge/` exists"
-    old_claude = "After copy:\n- Verify `.claude/skills/project-knowledge/` exists"
-    new = """After copy:
-- Generate Codex runtime files from Claude source:
-
-```bash
-~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply
-```
-
-- Verify required dual-runtime files exist before any registry, backlog, git, or GitHub step:
-
-```bash
-REQUIRED_PATHS=(
-  "CLAUDE.md"
-  ".claude/skills/project-knowledge/SKILL.md"
-  ".claude/skills/project-knowledge/references/project.md"
-  "AGENTS.md"
-  ".codex/skills/project-knowledge/SKILL.md"
-  ".codex/skills/project-knowledge/references/project.md"
-  "README.md"
-  ".env.example"
-  ".gitignore"
-  "work/completed/.gitkeep"
-)
-
-for path in "${REQUIRED_PATHS[@]}"; do
-  if [ ! -e "$path" ]; then
-    echo "Dual-runtime template assertion failed: missing $path" >&2
-    exit 1
-  fi
-done
-```"""
-    if old_codex in text:
-        text = text.replace(old_codex, new)
-    if old_claude in text:
-        text = text.replace(old_claude, new)
-    return text
-
-
 def adapt_command_body(source: Path, source_root: Path) -> str:
     _, body = strip_frontmatter(read_text_source(source, source_root))
     body = adapt_tool_terms(body).lstrip()
-    if source.stem == "init-project":
-        body = inject_init_project_asserts(body)
     policy = (
         "## Codex Policy Gates\n\n"
         "- Ask before external actions such as GitHub repository creation, `git push`, deploys, or sending messages unless the user explicitly requested that exact action.\n"
@@ -1066,56 +987,6 @@ def make_skill_symlink_item(
     )
 
 
-def build_template_items(config: SyncConfig, manifest_targets: dict[str, str]) -> list[PlanItem]:
-    source_root = config.claude_root / TEMPLATE_REL
-    target_root = config.codex_root / TEMPLATE_REL
-    if not source_root.is_dir():
-        raise SyncError(f"missing source template: {source_root}")
-    items: list[PlanItem] = []
-    for source in sorted(path for path in source_root.rglob("*") if path.is_file()):
-        source_rel = source.relative_to(source_root)
-        if not is_syncable_file(source_rel):
-            continue
-        if source_rel.parts[:1] == (".claude",) and source.name.startswith("settings") and source.suffix == ".json":
-            continue
-        source_content = read_text_source(source, config.claude_root)
-        source_target = target_root / source_rel
-        validate_target(source_target, config.codex_root)
-        items.append(
-            PlanItem(
-                action=classify_managed_write(source_target, source_content, manifest_targets),
-                source=source,
-                target=source_target,
-                adapter="new-project-template",
-                content=source_content,
-            )
-        )
-        codex_rel = template_codex_target_rel(source_rel)
-        if codex_rel is None:
-            continue
-        content = adapt_template_file(source, config.claude_root)
-        target = target_root / codex_rel
-        validate_target(target, config.codex_root)
-        action = classify_managed_write(target, content, manifest_targets)
-        items.append(PlanItem(action=action, source=source, target=target, adapter="new-project-template", content=content))
-    return items
-
-
-def build_script_item(config: SyncConfig, manifest_targets: dict[str, str]) -> PlanItem:
-    source = config.claude_root / SCRIPT_REL
-    target = config.codex_root / SCRIPT_REL
-    content = adapt_create_backlog(source, config.claude_root)
-    validate_target(target, config.codex_root)
-    return PlanItem(
-        action=classify_managed_write(target, content, manifest_targets),
-        source=source,
-        target=target,
-        adapter="script",
-        content=content,
-        mode=0o755,
-    )
-
-
 def build_skill_items(
     config: SyncConfig,
     manifest_targets: dict[str, str],
@@ -1154,7 +1025,16 @@ def build_skill_items(
                 continue
             target = target_root / source_rel
             validate_target(target, config.codex_root)
-            items.append(make_skill_file_item(source, config.claude_root, target, "skill", manifest_targets))
+            items.append(
+                make_skill_file_item(
+                    source,
+                    config.claude_root,
+                    target,
+                    "skill",
+                    manifest_targets,
+                    source.relative_to(skill_dir),
+                )
+            )
     return items
 
 
@@ -1253,15 +1133,6 @@ def build_stale_items(
     return items
 
 
-def build_template_stale_items(config: SyncConfig, prune: bool) -> list[PlanItem]:
-    template_root = config.codex_root / TEMPLATE_REL
-    stale_settings = template_root / ".claude" / "settings.json"
-    if not stale_settings.exists():
-        return []
-    action = "delete" if prune else "stale managed"
-    return [PlanItem(action=action, source=None, target=stale_settings, adapter="new-project-template", reason="Claude-shaped template leftover")]
-
-
 def build_project_items(
     config: SyncConfig,
     manifest_targets: dict[str, str],
@@ -1307,7 +1178,17 @@ def build_project_items(
                     continue
                 target = codex_skills_dir / source_rel
                 validate_project_target(target, project)
-                items.append(make_skill_file_item(source, project, target, "project-skill", manifest_targets))
+                skill_relative = source.relative_to(child) if child.is_dir() else Path(source.name)
+                items.append(
+                    make_skill_file_item(
+                        source,
+                        project,
+                        target,
+                        "project-skill",
+                        manifest_targets,
+                        skill_relative,
+                    )
+                )
     agents_dir = project / ".claude" / "agents"
     if agents_dir.is_dir():
         for source in sorted(agents_dir.glob("*.md")):
@@ -1438,7 +1319,7 @@ def build_orphan_items(config: SyncConfig, items: list[PlanItem], prune: bool, w
             # targets get the same allowlist/containment/symlink validation as
             # any other target before a delete can be planned.
             try:
-                validate_any_target(config=config, path=path, allow_template_stale=True, symlink_leaf=path.is_symlink())
+                validate_any_target(config=config, path=path, symlink_leaf=path.is_symlink())
             except SyncError as exc:
                 warnings.append(f"manifest-recorded output failed target validation; not touching: {target} ({exc})")
                 continue
@@ -1485,12 +1366,9 @@ def build_plan(config: SyncConfig, prune: bool) -> SyncPlan:
     if config.project_root is not None:
         items = build_project_items(config, manifest_targets, manifest_links, prune)
     else:
-        items = build_template_items(config, manifest_targets)
-        items.append(build_script_item(config, manifest_targets))
-        items.extend(build_skill_items(config, manifest_targets, manifest_links, warnings))
+        items = build_skill_items(config, manifest_targets, manifest_links, warnings)
         items.extend(build_agent_items(config, manifest_targets, manifest_links))
         items.extend(build_command_items(config, manifest_targets, manifest_links))
-        items.extend(build_template_stale_items(config, prune))
         items.extend(
             build_stale_items(config.codex_root, prune, "Claude-shaped Codex wrapper leftover", manifest_targets, manifest_links)
         )
@@ -1503,7 +1381,6 @@ def build_plan(config: SyncConfig, prune: bool) -> SyncPlan:
         validate_any_target(
             item.target,
             config,
-            allow_template_stale=item.action in {"delete", "stale managed", "skip unmanaged"},
             symlink_leaf=item.link_target is not None,
         )
         if item.content and contains_secret_like_content(item.content):
@@ -1820,7 +1697,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     mode.add_argument("--dry-run", action="store_true", help="Show planned changes without writing. Default.")
     mode.add_argument("--apply", action="store_true", help="Apply planned changes.")
     mode.add_argument("--check-drift", action="store_true", help="Alias for --dry-run: report drift between sources and targets.")
-    parser.add_argument("--prune", action="store_true", help="Delete stale managed template leftovers.")
+    parser.add_argument("--prune", action="store_true", help="Delete stale managed outputs.")
     parser.add_argument("--confirm-delete", action="store_true", help="Required with --apply --prune.")
     parser.add_argument("--claude-root", type=Path, default=Path.home() / ".claude")
     parser.add_argument("--codex-root", type=Path, default=Path.home() / ".codex")

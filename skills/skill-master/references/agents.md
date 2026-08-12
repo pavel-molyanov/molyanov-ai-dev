@@ -1,356 +1,268 @@
 # Skill + Agent Pattern
 
-Subagents handle context-heavy subtasks for orchestrator skills. Each runs in isolated context, performs work, and returns results (or modifies files directly).
+Subagents isolate context-heavy work from the orchestrator. A skill holds reusable methodology;
+an agent adds a bounded role, necessary tools, and a result contract.
 
-## Why Subagents
+## Contents
 
-The orchestrator's context window is limited. Loading a skill, conversation history, and project context already consumes significant space. If the orchestrator opens many files, runs extensive analysis, or generates verbose output, context fills up and quality degrades.
+- [Runtime-neutral orchestration](#runtime-neutral-orchestration)
+- [When to delegate](#when-to-delegate)
+- [Inline and dedicated agents](#inline-and-dedicated-agents)
+- [Agent file format](#agent-file-format)
+- [Reviewer contract](#reviewer-contract)
+- [Other agent contracts](#other-agent-contracts)
+- [Orchestrator responsibilities](#orchestrator-responsibilities)
+- [Invoking agents from skills](#invoking-agents-from-skills)
 
-**Solution:** Delegate heavy work to subagents. Each runs in isolated context, performs its task, and returns a structured result. The orchestrator receives only what it needs.
+## Runtime-neutral orchestration
 
-**Impact:** According to Anthropic research, multi-agent systems with Claude Opus orchestrator and Claude Sonnet subagents outperform single-agent Claude Opus by 90.2% on research tasks.
+Use the subagent mechanism available in the current runtime. Describe the role and required
+result without assuming a particular Team, Task, transcript, or transport API.
 
-## Orchestration Rules
+Nested delegation is allowed when the runtime supports it and the subtask genuinely benefits
+from another isolated context. The delegating agent remains responsible for its own bounded
+result. If nested delegation is unavailable or unnecessary, it returns the need to the
+orchestrator instead.
 
-Subagents cannot call other subagents — Claude Code supports only one level of orchestration. Nested calls fail silently:
+Agents inherit the orchestrator's model. Do not set a different model in callers; agent
+definitions use `model: inherit` where the runtime supports that field.
 
-```
-Orchestrator (main skill)
-    ├── code-reviewer (subagent) ✓
-    ├── security-auditor (subagent) ✓
-    └── test-reviewer (subagent) ✓
+## When to delegate
 
-code-reviewer
-    └── another-agent ✗ FORBIDDEN
-```
+| Task type | Why isolation helps | Example |
+|---|---|---|
+| Review | Fresh context reduces anchoring on the implementation | Code or security review |
+| Research | Extensive file reading stays outside the main context | Codebase exploration |
+| Debugging | A focused trace keeps logs and hypotheses bounded | Root-cause analysis |
+| Validation | A clean context can simulate or verify independently | Schema or skill review |
+| Parallel work | Independent questions can run concurrently | Researching separate modules |
+| High-volume work | Large logs and test output stay isolated | Test-suite analysis |
 
-If subagent needs more work → return to orchestrator → orchestrator launches another subagent.
+Delegate a concrete, bounded task. Keep decisions that combine findings, user scope, and the
+overall solution with the orchestrator.
 
-## When to Use Subagents
+## Inline and dedicated agents
 
-| Task Type | Why Subagent Helps | Example |
-|-----------|-------------------|---------|
-| Reviews | Fresh context for objective assessment | code-reviewer, security-auditor |
-| Research | Extensive file reading stays isolated | Exploring codebase, reading docs |
-| Debugging | Isolated diagnosis without polluting main context | Error analysis, root cause |
-| Validation | Schema/format checking with clean slate | skill-checker, schema-validator |
-| Parallel work | Multiple independent directions | Research 3 modules simultaneously |
-| High-volume output | Tests, logs don't bloat main context | Running test suite, log analysis |
+Use an inline subagent for a short, one-off task whose prompt can state the scope and result
+directly. Use the runtime's suitable exploration, analysis, or execution role; role names differ
+between runtimes.
 
-## Inline Agents (Ad-hoc Tasks)
+Create a dedicated Skill + Agent pair for a reusable task with substantial methodology:
 
-For simple, one-off tasks — use Task tool with built-in subagent types:
+1. The skill contains the domain methodology and remains usable without an agent.
+2. The agent preloads that skill, receives a bounded input, and defines the result contract.
 
-```markdown
-Use Explore subagent to find all files related to authentication
-Use general-purpose subagent to analyze the error and suggest fixes
-Use Plan subagent to design implementation approach for {feature}
-```
+This keeps methodology in one source while giving repeated reviews fresh context.
 
-The orchestrator calls Task tool with arbitrary prompt and `subagent_type`. No agent file needed.
+### Responsibility split for reviewers
 
-**Built-in subagent types:**
-- `Explore` — fast codebase exploration, file search, pattern matching
-- `general-purpose` — flexible tasks, research, analysis
-- `Plan` — designing implementation approaches
+- The skill owns reusable domain criteria, checklists, decision rules, and defect examples.
+- The reviewer agent owns the fresh skeptical stance, bounded input, evidence to read,
+  reviewer-specific hunt or investigation mechanics, evidence gate, diagnostic result fields,
+  direct JSON response, and the exclusions against editing, designing remediation, or making a
+  release decision.
+- The caller owns launching a fresh reviewer, supplying complete context, evaluating returned
+  findings, and deciding whether an authorized correction is warranted.
 
-**When to use:**
-- Simple research/exploration
-- One-off file operations
-- Tasks under 50 lines of instructions
-- No reuse needed
+Do not repeat the preloaded skill's reusable domain rules in the agent. When a necessary reusable
+rule exists only in an agent, move it into the preloaded skill before removing the agent copy;
+this preserves behavior while restoring one canonical owner. Mechanics used only to investigate
+the reviewer agent's bounded lane may remain in that agent.
 
-## Dedicated Agents (Skill + Agent Pattern)
+## Agent file format
 
-For complex, reusable tasks — create **Skill + Agent pair**:
-
-1. **Skill** — holds methodology (WHAT to do, HOW to analyze)
-   - Usable inline via `/skill-name`
-   - Contains knowledge
-
-2. **Agent** — adds isolation + output contract
-   - Uses `skills:` to preload methodology
-   - Defines output: JSON, file changes, or actions
-   - Runs in isolated context
-
-**Example:**
-
-```yaml
-# skills/code-reviewing/SKILL.md — methodology
----
-name: code-reviewing
-description: Code review methodology and quality standards.
----
-## What to Check
-- Architecture, error handling, edge cases...
-
-## Severity Levels
-- Critical, Major, Minor...
-```
-
-```yaml
-# agents/code-reviewer.md — isolation + format
----
-name: code-reviewer
-description: Review code quality after implementation.
-color: blue
-skills:
-  - code-reviewing    # Full SKILL.md content loaded
-allowed-tools: Read, Glob, Grep
----
-Follow code-reviewing methodology.
-
-## Output
-{ "findings": [...], "summary": {...} }
-```
-
-**Benefits:**
-- Methodology usable inline (`/code-reviewing`) OR in isolation (via agent)
-- Multiple agents can run in parallel
-- No methodology duplication — skill is single source of truth
-- Agent adds structure (output contract) without bloating skill
-
-## Agent File Format
-
-Agent files use YAML frontmatter + Markdown body. Store in `~/.claude/agents/{name}.md`.
+Store source definitions in `~/.claude/agents/{name}.md`. Generated runtimes may adapt the
+frontmatter and tool names during synchronization.
 
 ```yaml
 ---
 name: agent-name
 description: |
-  When Claude should delegate to this agent. Include:
-  - Purpose and capabilities
-  - Example triggers
-  - What NOT to use it for
+  Explains the bounded purpose, when to delegate, and important exclusions.
+model: inherit
 color: blue
 skills:
   - methodology-skill
 allowed-tools: Read, Glob, Grep
 ---
 
-# Agent Instructions
-
 ## Input
-[What the agent receives from the orchestrator]
+
+State the paths, requirements, scope, and evidence the orchestrator supplies.
 
 ## Process
-[Step-by-step methodology — or reference preloaded skill]
+
+Apply the preloaded methodology to the complete relevant artifact and its contracts.
 
 ## Output
-[Output contract: JSON schema, file changes, or actions]
+
+Return the role's structured result directly to the orchestrator.
 ```
 
-### Required Fields
+Required frontmatter fields are `name`, `description`, `color`, and `skills` when methodology is
+preloaded. Use only the tools needed for the task. Analysis agents normally need read/search
+tools; add shell access only for relevant read-only checks. Do not grant write access to a
+reviewer merely to persist its report.
 
-| Field | Description |
-|-------|-------------|
-| `name` | Unique identifier (kebab-case) |
-| `description` | When/why to use — Claude reads this to decide delegation |
-| `color` | Badge color for visual identification (see below) |
-| `skills` | Skill(s) to preload — agent must have methodology from skill |
+## Reviewer contract
 
-### Color Recommendations
+A reviewer, validator, checker, scanner, or critic diagnoses the supplied artifact. It does not
+modify the artifact, design remediation, or decide whether the result may ship.
 
-All agents must have a color for visual identification. Valid values: `red`, `blue`, `green`, `yellow`, `purple`, `orange`, `pink`, `cyan`.
+### Stance and scope
 
-| Color | Agent Type |
-|-------|------------|
-| blue/cyan | Analysis, review (code-reviewer, test-reviewer) |
-| red | Security, critical (security-auditor) |
-| yellow | Validation, caution (skill-checker, schema-validator) |
-| green | Success-oriented, exploration (Explore) |
-| purple/pink | Creative, generation, research |
-| orange | Infrastructure, deployment |
+The reviewer starts from fresh context, reads the complete artifact, and follows relevant
+callers, dependencies, standards, and contracts. It actively tries to disprove correctness but
+does not assume a defect must exist. Accuracy matters more than the number of findings, and a
+clean result is a complete valid outcome.
 
-### Optional Fields
+Review the current change or other scope supplied by the orchestrator. An unrelated pre-existing
+problem is not a finding unless the supplied scope includes it or the current change creates a
+demonstrable path to it.
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `model` | `inherit` | Always use `inherit` to match orchestrator's model |
-| `allowed-tools` | All tools | Restrict to necessary tools (e.g., `Read, Glob, Grep`) |
-| `permissionMode` | `default` | Permission handling: `default`, `acceptEdits`, `bypassPermissions`, `plan` |
-| `hooks` | None | Lifecycle hooks for validation |
+### Evidence gate
 
-## Output Contracts
+Create a finding only when all five facts are established:
 
-Agents always return JSON report — even if they modify files or execute commands. Work is the process, output is the report.
+1. `location` identifies the concrete artifact location.
+2. `evidence` states the observed fact, not a suspicion.
+3. `violated_requirement` names the requirement, standard, or contract that the fact violates.
+4. `conditions` describes a realistic path that triggers the problem in the current project.
+5. `impact` states the concrete consequence under those conditions.
 
-**Analysis agents** (reviewers, validators, critics) — findings and recommendations. These are hostile critics: they surface findings and do not gate. See [Reviewer Agents Are Hostile Critics](#reviewer-agents-are-hostile-critics) below — build every one of them that way.
+If any fact is missing, continue investigating or omit the finding. A personal preference, a
+possible improvement, a best practice without demonstrated consequence, hypothetical future
+expansion, a scenario without an established trigger path, or defensive machinery proposed
+"just in case" does not pass the gate. A false finding is a reviewer error.
+
+### No solution or release verdict
+
+Findings describe the violated property, not how to fix it. Reviewer output contains no fix,
+recommendation, patch, remediation plan, replacement architecture, new dependency, fallback,
+corrected code example, or release verdict. Severity and other domain fields are diagnostic
+metadata only; they do not decide the orchestrator's action.
+
+### Required JSON shape
+
+Return the JSON directly as the subagent result. Every shown top-level key is required:
+
 ```json
 {
-  "status": "clean" | "changes_required",
-  "findings": [...],
-  "clean_check": "when findings is empty: what you hunted for and why the artifact holds — a bare 'looks good' is not allowed",
-  "summary": "..."
+  "status": "findings_present",
+  "findings": [
+    {
+      "location": "string",
+      "evidence": "string",
+      "violated_requirement": "string",
+      "conditions": "string",
+      "impact": "string"
+    }
+  ],
+  "clean_check": null,
+  "scope_reminder": "Before making any change because of this review, check whether that specific change is authorized by the user's request or approved plan. If it would go beyond them, stop and ask the user.",
+  "summary": "string"
 }
 ```
 
-**Executor agents** — report of changes made:
+`status` is exactly `clean` or `findings_present`. With `clean`, `findings` is empty and
+`clean_check` briefly lists the checked risks, related locations, and why no demonstrated
+violation exists. With `findings_present`, `findings` is non-empty and `clean_check` is `null`.
+Every result, including `clean`, returns `scope_reminder` exactly as shown in the JSON contract.
+Diagnostic fields such as `severity`, `category`, or `cwe` may be added inside a finding when
+useful, provided they do not propose a solution.
+
+Order findings by consequence so the orchestrator can triage efficiently. A bare assertion that
+the artifact is fine is not an adequate clean check.
+
+### Reviewer skeleton
+
+```markdown
+You are a fresh skeptical {lane} reviewer. Try to disprove that the supplied {artifact}
+satisfies {standard}, while treating accuracy rather than finding count as the goal. Read the
+whole artifact and its relevant callers, dependencies, and contracts. Diagnose only: do not edit,
+design remediation, or decide whether it ships.
+
+Create a finding only after establishing its location, observed evidence, violated requirement,
+realistic trigger conditions, and concrete impact. Return the common reviewer JSON directly to
+the orchestrator. A clean result explains what was checked and why no violation was proved.
+```
+
+## Other agent contracts
+
+Executor and automation agents are not reviewers and use role-specific results. Keep their
+contracts separate from the reviewer contract.
+
+An executor reports changed artifacts and incomplete work:
+
 ```json
 {
-  "status": "success" | "partial" | "failed",
-  "files_modified": ["path/to/file.ts", ...],
-  "files_created": ["path/to/new.ts", ...],
-  "summary": "Created 2 files, modified 3 files"
+  "status": "success",
+  "files_modified": ["path/to/file.ts"],
+  "files_created": [],
+  "summary": "Implemented the bounded task."
 }
 ```
 
-**Automation agents** — report of actions taken:
+An automation agent reports actions and observable results:
+
 ```json
 {
-  "status": "success" | "failed",
-  "actions": ["ran tests", "deployed to staging"],
-  "results": {...},
+  "status": "success",
+  "actions": ["ran tests"],
+  "results": {},
   "errors": []
 }
 ```
 
-## Reviewer Agents Are Hostile Critics
+## Orchestrator responsibilities
 
-Any agent whose job is to **judge an artifact** — a reviewer, a validator, a checker, a critic — has one dominant failure mode: it rubber-stamps. Left neutral, a model reviewing work takes the safe path and says "looks good," because approving costs nothing and finding fault feels like conflict. A lenient reviewer is worse than no reviewer: it gives false confidence while the artifact stays flawed, and the holes surface later in a fresh session.
+The orchestrator launches a fresh reviewer instance with the touched artifacts, deleted or
+renamed-file evidence, generated or mechanical evidence, relevant requirements, and complete
+related contracts or callers. Freshness is an orchestration property; the reviewer does not need
+round history.
 
-So every critic agent you create alongside a skill is built as a **hostile critic, not a gatekeeper**. This is not optional flavor — it is the contract that makes review actually work. (It applies only to *judging* agents. Executor agents that produce work, and automation agents that take actions, follow their own contracts above.)
+For every returned finding, the orchestrator checks the evidence gate and chooses the simplest
+sufficient response. Evaluate the specific intended correction, not only the finding. Apply it
+automatically only when that exact correction is authorized by the user's request or approved
+plan. A valid finding and its severity do not authorize additional work.
 
-### The six principles
+If the correction has no clear authorization anchor, or it adds or expands behavior, tests,
+validation, files, workflow steps, state, fallbacks, abstractions, or material complexity beyond
+the agreed work, show the user the finding and proposed correction, then wait for a decision before
+changing artifacts. Surface unsupported or unrelated findings without acting on them.
 
-**1. Adversarial stance, set in the opening line.** The first paragraph is the agent's identity and frames the whole run. Write it so the agent's job is to *build the case against* the artifact, not to bless it:
+Before the first review, select the complete reviewer set required by all active skills for the
+work. Launch that complete set in parallel against the same artifact revision as one review wave;
+active skills do not start independent wave sequences. After a correction, use a fresh wave when
+another review is warranted so every included reviewer re-reads the whole artifact without
+anchoring on prior findings. A workflow may set a stricter limit, but it must not require more than
+three automatic review waves. Stop earlier when a wave is clean or no authorized correction changes
+the reviewed result.
 
-> You are a hostile {lane} critic, not a gatekeeper. Your job is to build the case that {artifact} {fails in your lane} — find every real {hole} and report it.
+After the final permitted wave, do not launch another reviewer automatically. Correct remaining
+local defects only within the agreed behavior, run the applicable direct checks, and return any
+remaining findings or required scope and design decisions to the user. A new explicit user request
+may start another review cycle; do not persist or reconstruct wave counts across separate runs.
 
-Then three explicit refusals: do not soften a finding, do not excuse a weak spot as "probably fine," do not stay silent to be safe. Close with the stake: *a critic who blesses flawed work has failed; a critic who finds nothing in a flawed artifact has failed.* **Why:** a neutral "review this" invites the safe "OK"; naming the agent a hostile critic in the first sentence flips its default from lenient to digging.
+If a durable log is needed, the orchestrator stores the returned JSON. The reviewer does not need
+a report path or write permission.
 
-**2. The reviewer surfaces; the orchestrator decides.** State plainly that the agent does not gate — it does not decide whether the artifact ships. The orchestrator makes that call, weighing findings against its own copy of the standard. **Why:** the ship/no-ship decision is exactly what tempts a reviewer to be lenient. Remove it, and the agent's only job becomes producing the best possible list of real problems — no reason left to go easy.
+## Invoking agents from skills
 
-**3. Read the whole artifact from scratch, not the diff.** The agent reads the entire artifact and every dependency it relies on, not just what changed. It understands what the change touches, but judges it in the context of the whole. **Why:** a diff shows what moved; a real hole usually lives where a change now contradicts an untouched part. Diff-only review is the single most common way holes slip through — the change looks fine in isolation and breaks something three sections away.
-
-**4. Freshness is the orchestrator's job, not the agent's.** Keep round-awareness out of the agent entirely — it never needs to know which round it is or what a prior instance found. The orchestrator spawns a new instance each round (see [The orchestrator's half of the deal](#the-orchestrators-half-of-the-deal)), so every critic reads the artifact cold and structurally cannot anchor on "was my finding fixed?". The agent just gets a list of touched files, reads them whole (principle 3), and hunts. **Why:** a critic that tracks its own prior findings shrinks its scope each round and goes blind to holes a fix introduced; spawning fresh removes that failure at the source, and loading the agent with the round process is dead weight it never acts on.
-
-**5. Every finding traces to a standard, with a location.** Each finding points to a concrete principle in the skill/spec/standard the agent checks against, and quotes the exact line or location. A finding without a location and a standard is noise. **Why:** taste-based findings can't be adjudicated and erode the orchestrator's trust in the whole report; anchored findings are actionable and let the orchestrator judge fast.
-
-**6. Output discipline: no gate, worst-first, justified clean.** Findings are ranked worst-first — the highest-consequence problem at the top — with no severity threshold that hides "minor" issues. A clean verdict is allowed only when an honest full re-read genuinely finds nothing, and then the agent states what it hunted for and why the artifact holds. **A bare "approved" or "looks good" is not a review.** **Why:** worst-first lets the orchestrator triage at a glance; the justified-clean rule closes the rubber-stamp escape hatch — the agent can't pass by staying silent, it has to prove it looked.
-
-### The orchestrator's half of the deal
-
-Hostile reviewers surface findings even on a decent artifact — that is working as intended, not a bug. The orchestrator that calls them judges each finding on merit (severity is metadata, not a filter): a real hole → fix it; a finding you disagree with or aren't sure about → push back or discuss with the user. Without this judgment step, meaner reviewers just cause thrash — the orchestrator chases every nitpick. The two halves are a pair: aggressive reviewers *plus* an orchestrator that decides. See [Invoking from Skills](#invoking-from-skills) for the finding-processing pattern.
-
-Three rules keep that judgment from snowballing one change into a rewrite of everything nearby:
-
-**Scope discipline.** Fix unconditionally only what falls within the original scope of the work — the acceptance criteria of this task/change plus the files the change already touched. A finding that reaches outside that (new behavior beyond the criteria, a file the change never touched, a pre-existing defect unrelated to the change) is not fixed silently: surface it to the user for a scope decision. Reason: a hostile critic reading whole files will legitimately spot problems next door, and silently fixing them turns a scoped task into unbounded work the user never approved.
-
-**Round cap.** Cap fix→re-review at two rounds per critic phase (e.g. tests, then code — each phase gets its own two rounds, not two shared across both). Reason: a fresh critic re-reads the whole artifact each round and can surface new holes indefinitely; two rounds catch what a fix regresses without looping forever. If in-scope findings remain after the second round, stop and bring them to the user instead of starting a third.
-
-**A fresh critic each round is a new instance.** Spawn a new critic each round rather than handing the same one successive diffs. Reason: a critic that carries its previous context anchors on "was my finding fixed?" and stops hunting; a new instance reads the touched files from scratch, with no diff and no memory of the prior round, so it re-hunts the whole lane and catches holes a fix introduced.
-
-### Skeleton to adapt
-
-```markdown
-You are a hostile {lane} critic, not a gatekeeper. Your job is to build the case
-that {artifact} {fails in your lane} — find every {hole} and report it. You do
-not decide whether {artifact} ships; the orchestrator does that, weighing your
-findings against its own copy of {standard}. Do not soften a finding, do not
-excuse a weak spot as "probably fine," and do not stay silent to be safe. A
-critic who blesses flawed work has failed.
-
-## Process
-1. Read the whole {artifact} from scratch — and every {dependency} — not just the
-   diff. Judge what changed in the context of the whole.
-2. {lane-specific hunt method: simulate execution / walk each element / trace each claim}
-
-## Output
-No gate. Findings worst-first, each with a quoted location and the {standard} it
-breaks. Report clean only on an honest full re-read that finds nothing — then say
-what you hunted for and why it holds. A bare "approved" is not a review.
-```
-
-Fill `{lane}`, `{artifact}`, `{hole}`, and `{standard}` for the specific critic; the three skill-master reviewers (`skill-checker`, `skill-logic-reviewer`, `skill-simplicity-reviewer`) are worked examples of this skeleton.
-
-## Resuming Agents
-
-After agent completes, orchestrator receives `agentId`. Use it to continue work with same context:
-
-```
-Resume agent {agentId} to ask follow-up question about findings
-```
-
-**When to resume:**
-- Need clarification on agent's findings
-- Iterative refinement (agent found X, now do Y based on X)
-
-**When NOT to resume (start fresh):**
-- Different task, unrelated to previous
-- Context would confuse agent
-- Previous work is complete, new work begins
-
-## Writing Effective Descriptions
-
-The `description` field is critical — Claude uses it to decide when to delegate. Include:
-
-1. **Purpose** — what the agent does
-2. **Triggers** — when to use (with examples)
-3. **Exclusions** — what NOT to use it for
-
-Example from `code-reviewer`:
-```yaml
-description: |
-  Use this agent when code has been written or modified and needs quality assessment.
-
-  **Examples of when to use:**
-  - After implementing a feature
-  - After refactoring code
-  - Before committing changes
-
-  **Proactive usage**: Invoke automatically after any code implementation task.
-```
-
-## Invoking from Skills
-
-Reference agents by name in skill workflow:
+Reference a dedicated agent by its role and provide complete input without prescribing a
+runtime-specific transport:
 
 ```markdown
-## Post-work
+Run a fresh `code-reviewer` with:
+- touched, deleted, renamed, generated, and mechanical artifacts;
+- the user request or user-spec;
+- applicable repository instructions and project contracts;
+- relevant callers, dependencies, and validation evidence.
 
-1. **Run Reviews** (launch in parallel)
-   - `code-reviewer` — quality, architecture, patterns
-   - `security-auditor` — OWASP Top 10, vulnerabilities
-
-2. **Process Findings** (see [The orchestrator's half of the deal](#the-orchestrators-half-of-the-deal))
-   Evaluate each finding on merit — severity is metadata, not a filter.
-   - Valid, in-scope, agree → apply (any severity)
-   - In-scope but you disagree or are uncertain → discuss with user
-   - Out of scope (new behavior, untouched files, unrelated pre-existing defect) → surface to user, don't fix silently
-   Log each finding with action taken.
-
-3. **Re-review** — spawn a fresh critic instance (not the same one); it re-reads the
-   touched files from scratch. Cap at two rounds per critic phase; if in-scope
-   findings remain, ask the user.
+Evaluate the returned findings against their evidence and the approved scope. Choose the
+simplest sufficient response; discuss scope, behavior, approach, or material-complexity changes
+with the user before acting.
 ```
 
-For agents needing specific input:
-
-```markdown
-Use `code-reviewer` subagent with:
-- files: {list of modified files}
-- userspec: {user requirements document}
-- techspec: {technical specifications}
-```
-
-## Best Practices
-
-1. **Define clear output contract** — JSON for analysis, file changes for executors
-2. **Restrict tools** — Most agents only need `Read, Glob, Grep`
-3. **Use `model: inherit`** — Ensures maximum quality from orchestrator's model
-4. **Always preload skill** — Agent must have methodology, not just output format
-5. **Include examples in description** — Helps Claude know when to invoke
-6. **One level of orchestration** — Subagents cannot call other subagents
-
-## Example Agents
-
-See existing agents for full examples:
-- `~/.claude/agents/code-reviewer.md` — Detailed methodology with review dimensions
-- `~/.claude/agents/security-auditor.md` — OWASP-based security analysis
-- `~/.claude/agents/skill-checker.md` — Skill validation against standards
-
-## References
-
-- [Create custom subagents - Claude Code Docs](https://code.claude.com/docs/en/sub-agents)
-- [Multi-agent research system - Anthropic](https://www.anthropic.com/engineering/multi-agent-research-system)
+Dedicated agent descriptions should state purpose, trigger, and exclusions concretely. Keep
+large domain prompts in the preloaded skill rather than duplicating them in every caller.

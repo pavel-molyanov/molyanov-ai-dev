@@ -8,64 +8,77 @@ description: |
 
 # Layout Writing
 
-Deliver a layout that matches its exact source where one exists, fills only genuinely unspecified decisions from project evidence, works at relevant widths, and fits the existing codebase. Keep verification proportional to the requested scope.
+Deliver a layout that matches its exact source where one exists, fills only genuinely unspecified
+decisions from project evidence, and works at relevant widths in the existing codebase.
 
-## Ownership
+## Scope and Source
 
-- `layout-writing` owns markup structure, styles, responsive behavior, typography application, asset placement, presentation, and visual verification.
-- `code-writing` owns data flow, state, APIs, validation, and business behavior. Use both skills for mixed work and keep their ownership separate.
-- Reproduce or extend an existing visual language. Blank-slate visual design needs a design source or separately approved design work.
+1. Read repository guidance, the affected component and styles, tokens, fonts, images, nearby
+   components, and the relevant run or build command.
+2. Classify the scope:
+   - `selected area` — verify the changed element, component, or section with its nearest context;
+   - `whole page` — build an ordered inventory of every major visual block from source metadata,
+     node IDs, a DOM outline, or complete source-image segments, then verify every item.
+3. With an exact source, apply [reproduce.md](references/reproduce.md) — source acquisition,
+   native-size evidence, and comparison. Without an exact source, apply
+   [design-decisions.md](references/design-decisions.md) — project-first decisions for unspecified
+   values. For a partial source, apply each reference only to the area it governs.
+4. Ask only for blockers that project or source evidence cannot resolve: the relevant frame when
+   a Figma link names only a file, substitution of a required missing font or asset, or expansion
+   beyond the requested scope.
 
-## Phase 1: Read the Project and Set the Scope
+Treat a new requirement, state, edge case, or improvement discovered during implementation or
+review as a proposal, not authorization. If it changes the agreed presentation, behavior, scope,
+approach, or material complexity, explain it and get the user's decision first. Correct
+autonomously only a local mismatch inside the already agreed presentation.
 
-1. Read the repository instructions and the project documentation they identify as required before changing the layout. Then inspect the affected component or template, its styles, tokens, fonts, images, nearby components, and the relevant run/build command. If project documentation is absent, use the existing code and interface without inventing project-wide rules.
-2. Classify the requested scope:
-   - `selected area` — one element, component, or section; verify it and its nearest context;
-   - `whole page` — a landing page or other long page; list its major visual blocks from top to bottom using the exact source when present or the current DOM and requested content otherwise, then verify every item. Preserve a compact inventory that proves the list is complete: parent-frame section metadata or node IDs, an ordered DOM outline with selectors, or segment ranges covering the full height of one long source image.
-3. Choose source guidance before implementation:
-   - With an exact source such as Figma, a Claude Design export, PDF, screenshot, or existing page to reproduce, read and apply [reproduce.md](references/reproduce.md) — source acquisition, exact block evidence, and comparison.
-   - Without an exact source, read and apply [design-decisions.md](references/design-decisions.md) — project-first choices for missing visual decisions.
-   - When the source defines only part of the task, read both. Apply `reproduce.md` to everything the source defines and `design-decisions.md` only to missing states, widths, or parts and to changes the user explicitly requested to differ from the source. General design advice does not override an intentional source value.
-4. Resolve only blockers that cannot be established from the project or source. Ask for the relevant frame or block when a Figma link identifies only a whole file, and ask before substituting a missing required font or asset or expanding beyond the requested scope.
+`layout-writing` owns markup structure, styles, responsive behavior, typography, asset placement,
+and visual verification. `code-writing` owns data flow, state, APIs, validation, and business
+behavior; use both for mixed work.
 
-**Checkpoint:** Required project guidance and source references were read; the selected area or complete page block list and its inventory, exact-source boundary, relevant files, and runnable verification path are known.
+## Implement and Capture Evidence
 
-## Phase 2: Implement and Verify
+1. Reuse suitable project components, tokens, primitives, fonts, images, and the asset pipeline.
+   Implement the smallest change that satisfies the request; exact-source values override general
+   design taste, while unspecified decisions follow project evidence.
+2. Build a deduplicated viewport list for `capture.mjs` and pass it explicitly with `--viewports`:
+   - `360`, `430`, `768`, and `1440` widths for baseline responsive coverage;
+   - every established exact-source or user-screenshot viewport;
+   - widths immediately before and after affected CSS breakpoints.
+   Use the owning source height when known; otherwise choose one stable representative height and
+   reuse it across captures and reruns.
+3. Before capturing, create one temporary evidence root outside the repository. Give every
+   capture or overlay invocation a new child `--out` path because the scripts reject existing
+   targets and prior evidence must remain unchanged.
+4. At every chosen width, render the selected area or every whole-page inventory block with its
+   nearest relevant context and affected states. Apply the native-size comparison procedure from
+   `reproduce.md` wherever an exact source exists; otherwise inspect composition, wrapping,
+   clipping, crop, states, and horizontal overflow.
+5. Correct confirmed mismatches and repeat only affected blocks and widths with new output paths.
+   Run the smallest project check that proves the changed route still compiles or renders.
 
-1. Reuse the project's components, tokens, layout primitives, fonts, images, and asset pipeline when they produce the required result. Adapt source-generated code to the real project rather than inserting it unchanged.
-2. Implement the smallest change that satisfies the request. Exact source measurements control defined colors, spacing, density, geometry, crop, and layering even when they look unusual. For unspecified decisions, follow project documentation and existing UI before the general rules in `design-decisions.md`.
-3. Build a deduplicated viewport list in the `WIDTHxHEIGHT` syntax required by `capture.mjs`, and pass the full list explicitly with `--viewports`:
-   - `360px`, `430px`, `768px`, and `1440px` for ordinary responsive coverage;
-   - the owning viewport width of every exact source and the user-screenshot width when its viewport and device scale are established;
-   - widths immediately before and after each breakpoint in the affected styles that changes the requested area or any affected block in a whole-page checklist.
-   Use the owning source viewport height when it is known; keep it separate from the compared block bounds. Otherwise declare one stable representative browser height and reuse it across captures and reruns; for example, use `360x900,430x900,768x900,1440x900` when `900px` is that declared height. This is a small targeted set, not a sweep across hundreds of widths.
-4. Render at each chosen owning viewport and capture the selected DOM block with `node scripts/capture.mjs --url <url> --project-root <repo> --viewports <explicit-WIDTHxHEIGHT-list> --selector <block> --out <dir>` from this skill directory. Use the smallest stable wrapper that also shows the nearest relevant context, or make one separate context capture when the block selector cannot include it. For affected interactive elements, exercise applicable states and prepare localized state captures or equivalent visual evidence. At widths without a source, inspect each separate site image for composition, text clipping, expected image crop, and horizontal overflow.
-5. For every width with an exact source, compare two separate, same-size images of the same block: the source block image and the site capture. Run `node scripts/overlay.mjs --reference <source-block.png> --actual <site-block.png> --project-root <repo> --out <dir>`, then inspect the source, actual, `diff.png`, and, when useful, `overlay.png` separately. Diagnose a size mismatch at the source node, DOM block, viewport, or crop boundary; do not silently resize either image.
-6. For a whole page, work through the block list sequentially. Capture every site block. For source-defined blocks, also acquire a separate source image and compare the pair; without an exact source, inspect the site capture against project documentation, existing UI, and `design-decisions.md`. Fix confirmed differences, mark the block checked, and continue. If a very tall source-defined block has no natural matching child blocks, use `overlay.mjs --parts 3`; inspect all three sequential `reference`, `actual`, `difference`, and `overlay` file sets. Do not replace block coverage with a long whole-page image or a collage.
-7. After a correction, repeat capture and comparison only for the affected block and widths. Run the smallest relevant project check that proves the changed route still compiles or renders.
+## Review and Hand Off
 
-**Checkpoint:** The requested area or every page block was inspected at the chosen widths; each exact-source block has same-size comparison evidence; major visible mismatches and horizontal overflow are absent.
+Run no more than two review waves. After every implementation, run wave 1 with one fresh
+`layout-reviewer` without a model override. Pass the request, scope, changed files, applicable
+repository instructions and project-pattern evidence, source mode and responsibility boundary,
+all checked widths, site images for every checked block and state, source and difference images
+where applicable, and the complete inventory and evidence set for a whole page or segmented tall
+block. Include reviewers required by other active skills in these same waves instead of starting a
+separate wave sequence.
 
-## Phase 3: Review and Hand Off
+Evaluate every finding by its source or project requirement, evidence, width and state conditions,
+and visible impact. Before changing the layout, evaluate the specific intended correction, not only
+the finding. Apply it automatically only when that exact correction is authorized by the user
+request or approved plan. A valid finding does not authorize additional work. If the correction
+has no clear authorization anchor or expands the agreed work, show the user the finding and proposed
+correction, then wait before editing. After an authorized correction changes the reviewed result,
+recapture affected evidence and run wave 2 with a fresh `layout-reviewer`. Stop after a clean wave
+or when no authorized correction changes the result.
 
-1. Invoke one fresh `layout-reviewer` after implementation. Pass:
-   - the user's request, selected-area or whole-page scope, and changed files;
-   - the exact-source, no-source, or partial-source mode, the reference file or files to read, and the boundary between their responsibilities;
-   - the complete list of checked widths;
-   - separate site images for every checked width and block, including prepared evidence for applicable affected states and nearest context;
-   - source and difference images additionally for every width where an exact source exists;
-   - for a whole page, the source- or DOM-derived block checklist, its compact inventory, and the prepared site evidence for every block and width;
-   - for `--parts 3`, all three complete `reference`, `actual`, `difference`, and `overlay` sets.
-2. Judge every finding against the source and project evidence. Fix confirmed in-scope mismatches, repeat only their relevant capture/comparison, and record disagreements or unresolved evidence. Ask before acting on out-of-scope findings or design changes not authorized by the request.
-3. Hand off with a short change summary, checks run, the widths and page blocks actually verified, reviewer-finding dispositions, and known limitations.
+After wave 2, do not launch another reviewer automatically. Correct remaining local mismatches
+inside the agreed presentation, recapture and inspect the affected widths and states, and report
+any remaining findings or required user decisions.
 
-**Checkpoint:** One reviewer inspected all supplied evidence, its in-scope findings were handled, and the handoff names the real verification coverage.
-
-## Self-Verification
-
-- [ ] Required project documentation and the applicable reference or references were read before implementation.
-- [ ] Exact-source and missing-design responsibilities stayed separate; general advice did not override the source.
-- [ ] `capture.mjs` received an explicit, deduplicated viewport list including `360px`, `430px`, `768px`, `1440px`, source widths, and affected breakpoint sides where applicable.
-- [ ] Exact comparisons used separate same-size block images; no silent resizing, collage, or whole-page shortcut replaced inspection.
-- [ ] Every item in a whole-page block list was checked sequentially, including all three parts of any indivisible tall section.
-- [ ] One `layout-reviewer` completed, findings were handled within scope, and the user received the checked widths and blocks.
+Hand off with the change summary, checks run, widths and blocks actually verified, finding
+dispositions, and known evidence limitations.

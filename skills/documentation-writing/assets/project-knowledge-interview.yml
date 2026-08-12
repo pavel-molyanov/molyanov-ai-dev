@@ -1,0 +1,154 @@
+# Project Knowledge interview state
+# Status: pending -> partial -> complete; use not_applicable with a reason in value.
+# Scoring: detailed 80-95, brief 50-70, vague 20-40, absent 0.
+
+interview_metadata:
+  started: ""
+  last_updated: ""
+  status: "not_started" # not_started | in_progress | completed
+  current_question_num: 0
+
+conversation_history: []
+# Entry: question_numbers, timestamp, topics, agent_questions, user_answer, summary
+
+decisions: []
+# Entry: topic, chosen, rejected, rationale
+
+cycle1_project_definition:
+  project_identity:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Project name and clear one-line description"]
+    required: true
+    evidence: []
+  purpose_and_problem:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Purpose, problem, and why the project exists"]
+    required: true
+    evidence: []
+  audience_and_use_cases:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Who uses it and for what"]
+    required: true
+    evidence: []
+  capabilities:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Key project capabilities"]
+    required: true
+    evidence: []
+  scope_boundaries:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Included and excluded scope"]
+    required: true
+    evidence: []
+  priorities_and_mvp:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Priorities and MVP boundary"]
+    required: true
+    evidence: []
+  development_approach:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["All at once or phases, grouping, and order after MVP"]
+    required: true
+    evidence: []
+  post_launch_ideas:
+    score: 0
+    status: pending
+    value: ""
+    gaps: []
+    required: false
+    evidence: []
+
+cycle2_architecture:
+  project_type_and_artifacts:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Coding or non-coding project and its authoritative artifacts"]
+    required: true
+    evidence: []
+  stack_and_rationale:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Applicable stack choices and reasons"]
+    required: true
+    evidence: []
+  structure_and_components:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Project structure, components, and responsibilities"]
+    required: true
+    evidence: []
+  dependencies_and_integrations:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Critical dependencies and external integrations"]
+    required: true
+    evidence: []
+  data_flow_and_model:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Applicable data sources, flow, storage, and model"]
+    required: true
+    evidence: []
+  constraints_and_sensitive_data:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Technical constraints and sensitive-data boundaries"]
+    required: true
+    evidence: []
+
+cycle3_operations_and_domains:
+  patterns_and_workflow:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Project-specific patterns, testing, Git, quality, and security gates"]
+    required: true
+    evidence: []
+  deployment_and_operations:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Environments, configuration names, delivery, rollback, and monitoring"]
+    required: true
+    evidence: []
+  migration:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Migration scope, risks, and rollback when applicable"]
+    required: true
+    evidence: []
+  ux_design_accessibility:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["UX, design system, interface language, and accessibility when applicable"]
+    required: true
+    evidence: []
+  domain_areas:
+    score: 0
+    status: pending
+    value: ""
+    gaps: ["Independently useful domain areas and ownership boundaries"]
+    required: true
+    evidence: []

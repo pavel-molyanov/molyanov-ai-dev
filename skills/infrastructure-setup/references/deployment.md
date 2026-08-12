@@ -1,0 +1,58 @@
+# Deployment Patterns
+
+Apply these rules to a persistent runtime service or an assessment of its current delivery and
+operations.
+
+## Project Contract
+
+- Project Knowledge states the actual runtime target, routine delivery path, direct-access policy,
+  environments, agent or operations host, monitoring placement, secrets locations, and recovery
+  model. If those facts are missing, contradictory, or inconsistent with runtime evidence,
+  discuss them with the user.
+- Preserve a sound existing model. When evidence shows that it is unsafe, unreliable, wasteful,
+  or needlessly complicated, report the problem and propose a better direction without changing
+  it outside the approved scope.
+
+## Delivery Model
+
+- The recommended pattern is repeatable routine delivery through repository CI/CD. Direct target
+  access is appropriate for inspection, initial bootstrap, troubleshooting, and bounded one-off
+  operations, but should not become an undocumented parallel routine delivery path. Project
+  Knowledge records the model that applies to the project.
+- Deliver the exact source revision or immutable artifact that passed the required checks. Do not
+  silently rebuild from different inputs after verification.
+- Scope remote commands and cleanup to the project. Host-wide Docker cleanup, firewall changes,
+  daemon reconfiguration, broad directory removal, or changes to neighboring services require
+  explicit agreement based on their wider impact.
+- Production deployment, a push that triggers production, and a direct production mutation need
+  authorization from the current request. When the authorization or impact is unclear, discuss it
+  before acting.
+
+## Placement and Environments
+
+- Before placing a project on a shared host, inspect actual running projects, bound ports,
+  storage, memory, and container resources. Names, paths, ports, networks, volumes, and limits must
+  not collide with neighboring projects. If safe placement is not established, discuss another
+  port, host, or delivery model.
+- Docker Compose is the normal default for an always-running service on a general-purpose host
+  when the project has not selected another runtime. Preserve a sound established systemd,
+  managed-platform, or other model.
+- For a new service used by people other than the owner, recommend a separate development
+  environment and discuss the choice. A private single-owner service may omit it when it adds no
+  useful validation boundary.
+- When development and production both exist, separate their configuration, secrets, data,
+  runtime paths, service identities, and external identities. They may share a physical host when
+  capacity and isolation are demonstrated.
+
+## Recovery and Runtime Evidence
+
+- A service with persistent data needs a backup suitable for its current risks and a known restore
+  path. Record which application revision and data version can be restored together; code rollback
+  alone is insufficient when migrations are not backward-compatible.
+- Keep the application revision, artifact or image, configuration, and backups required by the
+  documented rollback or last-known-good path.
+- A completed deployment is established by the real service boundary: expected process or
+  container identity, health, required dependency access, and a minimal business smoke check when
+  applicable. A successful command or running container alone is not proof that the service works.
+- Cleanup preserves active and rollback versions and does not remove persistent volumes unless the
+  project's documented data lifecycle requires it.

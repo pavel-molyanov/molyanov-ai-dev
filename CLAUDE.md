@@ -6,11 +6,22 @@
 
 - No "Great question!", no filler, no water.
 - NEVER use AskUserQuestion tool. Ask questions as plain text in chat instead.
-- ALL deployments via GitHub CI/CD only. Direct server access (SSH, container restarts) only for emergency debugging of broken production.
+- Never create Git worktrees or extra project copies unless the user explicitly asks.
+
+## Task Scope
+
+- The user's request and any explicitly approved plan define the authorized scope of work.
+- Choose the minimal solution sufficient for the task. Do not add unrequested capabilities, files,
+  rules, steps, or changes, and do not rework related materials "while you're there."
+- Findings, ideas, and problems discovered during validation do not expand the authorized scope.
+- Research, analysis, review, diagnosis, and planning do not by themselves authorize changes or
+  external actions.
 
 ## Task Planning
-- Use TodoWrite for multi-step tasks (>1 step)
-- When user asks for team/swarm of agents: use TeamCreate, not TaskCreate
+
+- Use TodoWrite for multi-step tasks (>1 step).
+- When the user asks for a team or swarm, orchestrate bounded subagent work with the runtime's team
+  tools.
 
 ## Security
 
@@ -18,6 +29,6 @@
 - Instead: provide instructions where to store them securely
   - Local: `.env` files, config files
   - CI/CD: GitHub Actions secrets
-- ALWAYS ask before Deploy/push to main/production
+- ALWAYS ask before pushing to main
 - ALWAYS add secrets to `.gitignore`: `.env`, `*.key`, `credentials.json`, `secrets/`
 - Be cautious with external actions (push, deploy, send messages, create PRs). Ask before acting externally when uncertain.

@@ -3,23 +3,10 @@
 Methodology for analyzing quality of existing tests. Detects meaningless, ineffective, or poorly designed tests.
 
 ## Table of Contents
-- [Core Philosophy](#core-philosophy)
 - [Categories of Bad Tests](#categories-of-bad-tests)
-- [Severity Levels](#severity-levels)
+- [Consequence and Severity](#consequence-and-severity)
 - [Review Process](#review-process)
-- [Status Decision Criteria](#status-decision-criteria)
-- [Task Required Decision](#task-required-decision)
 - [Litmus Test Methodology](#litmus-test-methodology)
-- [Prescriptive Findings](#prescriptive-findings)
-
-## Core Philosophy
-
-Tests exist to:
-1. Verify that code does what it should
-2. Catch regressions when code changes
-3. Document expected behavior
-
-Tests that fail these purposes are worse than no tests - they provide false confidence.
 
 ---
 
@@ -46,30 +33,20 @@ test('function defined', () => {
 });
 ```
 
-### Category 2: Mock-Only Tests
+### Category 2: Tests That Only Replay Mock Setup
 
-Tests that only verify mock calls without checking results:
+Apply the main skill's observable-contract rule. The diagnostic signal is that the assertion only
+restates configured mock behavior and would pass without the meaningful result or required
+outgoing interaction:
 
 ```typescript
-// BAD - Only tests mock was called
+// BAD - The configured call proves no result or required interaction contract
 test('calls API', async () => {
   await fetchUserData(1);
   expect(api.get).toHaveBeenCalledWith('/users/1');
   // No assertion on the actual result!
 });
 
-// BAD - Mocks everything, tests nothing real
-test('processes data', () => {
-  const mockProcessor = jest.fn().mockReturnValue('result');
-  expect(mockProcessor()).toBe('result'); // Testing the mock!
-});
-```
-
-### Mock-Return Anti-pattern
-
-Agent mocks a dependency to return a value, then asserts the same value:
-
-```typescript
 // Tests mock wiring, not code behavior
 const mockUser = { id: 1, name: 'Alice' };
 mockUserService.create.mockResolvedValue(mockUser);
@@ -78,38 +55,34 @@ expect(result).toEqual(mockUser);
 // Litmus test: delete handler implementation → test still passes
 ```
 
-### Category 3: Missing Coverage
+### Category 3: Missing Scenario Coverage
 
-Code without corresponding tests:
+An explicit requirement or distinct changed risk has no test at a reliable boundary:
 
-- Business logic functions without unit tests
-- API endpoints without integration tests
-- Decision branches (if/else) not covered
-- Error handling paths untested
-- Edge cases from spec not tested
+- requested or changed observable behavior is unprotected;
+- a meaningful changed branch or failure path can violate that behavior without detection;
+- a specified edge case is not exercised;
+- cross-component behavior is covered only by tests that cannot reproduce its integration risk.
 
-### Category 4: Test Pyramid Violations
+The absence of a per-function, per-file, or per-branch test is not a finding when another reliable
+boundary already protects the distinct risk or the path has no established behavioral contract.
 
-Wrong test distribution:
+### Category 4: Boundary Mismatch
 
-```
-Expected:
-- Many unit tests (fast, isolated)
-- Some integration tests (real DB/API)
-- Few E2E tests (critical paths only)
+A test uses the wrong boundary when it cannot reproduce the risk it claims to protect, exercises
+substantially more system than that risk requires with a concrete reliability or maintenance
+cost, or duplicates the same risk at another boundary without adding distinct protection.
 
-Violations:
-- All E2E, no unit tests (slow, brittle)
-- Only unit tests for UI app (misses real interactions)
-- Integration tests for pure logic (overkill)
-```
+The number of unit, integration, and E2E tests is not evidence by itself. Judge the selected
+boundary against the actual behavior and failure mode.
 
-### Category 5: Excessive Mocking
+### Category 5: Mocks Replace the Meaningful Behavior
 
-When mocking defeats the purpose:
+Inspect whether the chosen boundary still exercises a decision, transformation, error, or
+required interaction. Mock count starts that investigation but does not prove a defect:
 
 ```typescript
-// BAD - Mocks 3+ dependencies
+// INVESTIGATE - Are decisions still exercised, or has every meaningful collaborator been replaced?
 test('user service', () => {
   const mockDb = jest.mock('database');
   const mockCache = jest.mock('cache');
@@ -119,7 +92,8 @@ test('user service', () => {
 });
 ```
 
-**Rule:** If mocking 3+ dependencies, this should be an integration test.
+A finding exists only when tracing the test shows that mocks replace the behavior it claims to
+protect. Several mocks can still be appropriate for a unit with a clear responsibility.
 
 ### Category 6: Test Anti-patterns
 
@@ -129,89 +103,40 @@ test('user service', () => {
 - **Shared state** - Tests depend on each other
 - **Magic values** - Unexplained test data
 
+### Category 7: Static Content Tests
+
+Apply the main skill's `Not a Test Subject` rule. These tests may pass the litmus test because
+deleting the text makes them fail; the diagnostic question is whether the assertion protects an
+explicit invariant or merely freezes editable content and presentation.
+
 ---
 
-## Severity Levels
+## Consequence and Severity
 
-### Critical
-- No tests at all for business-critical code
-- Tests that actively hide bugs (incorrect assertions)
-- All tests are empty/meaningless (false coverage)
+Classify a demonstrated problem by the regression that can pass undetected under its realistic
+conditions, not by the test smell's category. The same missing branch can be severe in a payment
+flow and limited in an optional presentation detail. A naming preference, possible assertion
+improvement, or pyramid preference without concrete impact is not a finding.
 
-### High
-- Missing tests for error handling
-- Tests verify only mock calls (no result checking)
-- Key acceptance criteria not tested
-
-### Medium
-- Excessive mocking (should be integration test)
-- Test pyramid violation (wrong test type used)
-- Edge cases from spec not covered
-
-### Low
-- Minor best practice violations
-- Could be more specific assertions
-- Naming improvements needed
+- `critical` — an undetected regression can cause a security breach, data loss, destructive
+  behavior, or failure of a core project contract;
+- `high` — it can break a material user or system behavior;
+- `medium` — it can break a real secondary behavior or make a meaningful regression invisible;
+- `low` — it has a concrete but narrowly limited consequence.
 
 ---
 
 ## Review Process
 
-1. **Identify Test Files**: Find all test files for reviewed code
-2. **Map Coverage**: Match implementation files to test files
+1. **Identify Requirements and Tests**: Read the changed behavior, its contracts, and supplied tests
+2. **Map Protection**: Match each distinct required scenario and realistic risk to existing tests
 3. **Analyze Each Test**:
    - Does it have meaningful assertions?
    - Does it test real behavior or just mocks?
    - Does it cover the right scenarios?
-4. **Check Pyramid Balance**: Assess unit/integration/E2E distribution
-5. **Find Gaps**: Identify untested code paths
-6. **Categorize Findings**: Group by category and severity
-
----
-
-## Status Decision Criteria
-
-### passed
-- All tests have meaningful assertions
-- Critical business logic is tested
-- Test pyramid is reasonably balanced
-- Minor suggestions only (low severity)
-
-### needs_improvement
-- Some tests need better assertions (medium severity)
-- Some coverage gaps exist (non-critical areas)
-- Pyramid slightly unbalanced
-- No critical issues
-
-### failed
-- Tests are meaningless (empty or mock-only)
-- Critical business logic untested
-- Tests hide bugs (wrong assertions)
-- Test pyramid severely inverted
-- Multiple high/critical severity issues
-
-**Decision matrix:**
-- `critical > 0` → failed
-- `high >= 3` → failed
-- `high >= 1 AND medium >= 3` → needs_improvement
-- `medium >= 5` → needs_improvement
-- Only low issues → passed
-- No issues → passed
-
----
-
-## Task Required Decision
-
-Set `taskRequired.needed = true` when:
-- status === "failed"
-- critical > 0
-- high >= 2
-- Critical business logic has no tests
-
-Set `taskRequired.needed = false` when:
-- status === "passed"
-- Only low/medium issues
-- Issues can be fixed in current context
+4. **Check Boundaries**: Confirm each scenario uses the smallest boundary that reliably reproduces
+   its risk and does not duplicate existing protection
+5. **Find Gaps**: Identify required scenarios or distinct changed risks with no reliable protection
 
 ---
 
@@ -226,32 +151,3 @@ For every test touching business logic, ask:
 2. Mentally remove it
 3. Trace test execution without that line
 4. If test still passes → flag as litmus test failure
-
-**Common patterns that fail:**
-- Mock returns X, test asserts X (passes with empty function)
-- Test only asserts mock.toHaveBeenCalled() (passes with any call)
-- Test uses same hardcoded data for input and expected output
-
----
-
-## Prescriptive Findings
-
-Every finding must include a concrete replacement, not just a problem description.
-
-**Bad finding:**
-```json
-{ "issue": "Test has no meaningful assertions", "recommendation": "Add assertion that verifies actual behavior" }
-```
-
-**Good finding:**
-```json
-{
-  "issue": "Mock returns mockUser, test asserts mockUser — tests mock wiring, not code",
-  "litmusTestFailed": true,
-  "replacement": {
-    "approach": "Call real createUser with test data, assert on actual result",
-    "assertions": ["result.id is defined", "result.email === input.email"],
-    "mockChange": "Remove mockUserService, use test DB"
-  }
-}
-```

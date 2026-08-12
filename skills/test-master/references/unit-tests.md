@@ -1,150 +1,18 @@
 # Unit Testing Guide
 
-**For:** code-developer subagent working on a task
+Use a unit boundary when one unit owns the calculation, decision, validation, transformation, or
+error behavior being protected.
 
-## Table of Contents
-- [When to Write Unit Tests](#when-to-write-unit-tests)
-- [When Unit Tests Are Wrong Choice](#when-unit-tests-are-wrong-choice)
-- [Development Flow](#development-flow)
-- [What to Test](#what-to-test)
-- [How to Organize Tests](#how-to-organize-tests)
-- [Mocking Dependencies](#mocking-dependencies)
-- [Key Rules](#key-rules)
-- [Coverage Check](#coverage-check)
+## Preserve the Selected Boundary
 
-## When to Write Unit Tests
+- Exercise the meaningful unit behavior directly; do not replace it with configured mock values.
+- Replace dependencies only outside that boundary. Control network, database, filesystem, time,
+  or randomness when their real behavior is not the test subject.
+- Keep a real temporary filesystem, in-memory database, framework hook, or collaborating component
+  when the scenario depends on that behavior; then classify the test by the boundary it actually
+  exercises rather than forcing it to remain a unit test.
+- Assert required outgoing calls when the interaction itself is the observable contract. A call
+  assertion that only repeats mock setup proves nothing about the unit.
 
-Write unit tests **when justified**:
-
-### ✅ Write tests for:
-- Functions with business logic (calculations, validations, transformations)
-- Functions that make decisions (if/else, switch, conditions)
-- Data processing and formatting
-- Error handling logic
-- Edge cases and boundary conditions
-
-### ❌ Skip tests for:
-- Simple getters/setters without logic
-- One-line text changes or UI copy updates
-- Trivial configuration changes
-- Tasks without code (research, documentation, GitHub issues)
-
-**Rule of thumb:** If the function transforms data or makes a decision → test it.
-
-## When Unit Tests Are Wrong Choice
-
-### Excessive Mocking = Wrong Test Type
-
-If you need to mock 3+ dependencies to test something, consider:
-- Integration test (test with real dependencies)
-- E2E test (test in real environment)
-
-**Bad - testing mocks:**
-```typescript
-jest.mock('../db')
-jest.mock('../api')
-jest.mock('../cache')
-it('should process', () => {
-  process()
-  expect(db.save).toHaveBeenCalled()  // Tests mock, not behavior
-})
-```
-
-**Better:** Integration test with real dependencies.
-
-### UI Components with Complex State
-
-Don't unit test React/Vue components with mocked hooks and context.
-Use integration tests or E2E instead.
-
-**Bad:**
-```typescript
-jest.mock('../hooks/useAuth')
-jest.mock('../context/CartContext')
-it('renders', () => render(<Checkout />))
-```
-
-**Better:** E2E test that actually clicks through checkout flow.
-
-## Development Flow
-
-1. **Read the task** - Understand requirements and acceptance criteria
-2. **Write the code** - Implement the functionality
-3. **Write tests immediately** - Don't defer, write in the same session
-4. **Run tests** - Verify they pass
-5. **If tests fail** - Fix code or tests, repeat step 4
-6. **Return to orchestrator** - Only when all tests pass
-
-## What to Test
-
-### Test the task requirements
-All functionality described in the task must be covered:
-- Main happy path (expected behavior)
-- Edge cases mentioned in task
-- Error handling specified in task
-- Validation rules from task
-
-### Test business logic
-- Input validation (valid/invalid inputs)
-- Calculations (correct results, edge values)
-- Transformations (data format changes)
-- Conditional logic (all branches)
-- Error conditions (exceptions, failures)
-
-## How to Organize Tests
-
-### Structure: Arrange → Act → Assert
-
-1. **Arrange** - Set up test data and preconditions
-2. **Act** - Execute the function being tested
-3. **Assert** - Verify the result matches expectations
-
-### One test = one concern
-- Each test validates one specific behavior
-- Don't test multiple unrelated things in one test
-- Makes failures easier to diagnose
-
-### Clear test names
-Name tests to describe what they test:
-- `test_calculate_total_with_discount`
-- `test_validate_email_rejects_invalid_format`
-- `test_parse_date_handles_null_input`
-
-## Mocking Dependencies
-
-### What to mock
-- Database calls
-- API requests to external services
-- File system operations
-- Time/dates (for consistent tests)
-- Random number generators
-
-### Why mock
-- Tests run fast (milliseconds)
-- Tests are isolated (no external dependencies)
-- Tests are reliable (no network/DB failures)
-- Tests are repeatable (same result every time)
-
-### How to mock
-Use mocking libraries appropriate to your tech stack:
-- Mock external service responses
-- Mock database query results
-- Inject mocked dependencies into functions
-
-## Key Rules
-
-1. **Fast execution** - Unit tests must run in milliseconds
-2. **Isolated** - No real database, API, or file system access
-3. **Deterministic** - Same input → same output, always
-4. **Independent** - Tests don't depend on each other
-5. **Single assertion** - One test = one thing to verify
-6. **Immediate** - Write tests right after code, not later
-
-## Coverage Check
-
-Before returning to orchestrator, verify:
-- ✅ All business logic from task is tested
-- ✅ All tests pass
-- ✅ No skipped or commented-out tests
-- ✅ Edge cases are covered
-- ✅ Error handling is tested
+If meaningful behavior depends on real hooks, context, lifecycle, or several components, select an
+integration or E2E boundary instead.

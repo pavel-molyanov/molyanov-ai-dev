@@ -1,398 +1,300 @@
 ---
 name: methodology
 description: |
-  AI-First development methodology: spec-driven pipeline, project structure,
-  skills/agents ecosystem, quality gates.
+  Explains the current AI-First development methodology: skill routing, Project Knowledge,
+  user-spec planning and execution, evidence-gated reviews, feature finalization, and the
+  Claude/Codex dual runtime.
 
-  Use when: "изучи методологию", "изучи глобальную папку", "как работает методология",
-  "how does the methodology work", "explain the workflow"
-
-  For infrastructure tasks, use infrastructure-setup or deploy-pipeline skills.
+  Use when: "изучи методологию", "как работает пайплайн", "как делать фичи",
+  "как устроены скиллы", "how does the methodology work", "explain the workflow"
 ---
 
 # AI-First Development Methodology
 
-## What Is This
+## Purpose
 
-A structured development approach for AI agents. Every feature goes through a pipeline: idea → spec → architecture → tasks → implementation → documentation update. Each stage has automated validators and quality gates. QA and deploy are regular tasks in the tech-spec, not separate pipeline steps.
+The methodology keeps project and feature work understandable across sessions while making the
+process proportional to the task. Durable project facts live in Project Knowledge, an approved
+user-spec is the contract for a planned feature, execution skills own their domain workflows, and
+fresh reviewer agents diagnose completed work without taking decisions away from the orchestrator
+or the user.
 
-Core problems it solves:
-- **Context loss between sessions** — distributed knowledge base persists across sessions
-- **Quality without human review** — automated validators at every stage
-- **Scope creep** — specs approved before coding starts
-- **Outdated agent knowledge** — Context7 MCP fetches current library docs
+## Operating Model
 
----
+Requests route directly to skills by intent. The global `commands/` source is currently empty;
+feature planning, direct execution, initialization, documentation, and finalization do not depend
+on command wrapper files. Request the workflow in plain language; historical shorthand such as
+`/new-user-spec` or `/done` does not imply that an installed slash-command wrapper exists.
 
-## Development Pipeline
+Choose the smallest path that fits the work:
 
-The full path from idea to production. Each step has a command, a skill behind it, and validators.
+| Need | Path |
+|---|---|
+| Small, well-defined change | Invoke the matching execution skill directly |
+| Feature whose behavior or approach needs agreement | `user-spec-planning` → approval → execution → finalization |
+| New repository | `project-initialization` → initial Project Knowledge → feature or ad-hoc work |
+| Documentation-only work | `documentation-writing` with the evidence boundary named by the request |
+| Review or audit only | Use the matching review skill or reviewer without modifying the artifact |
 
-### Step 1: User Spec — `/new-user-spec`
+One request may activate several skills. For example, a UI feature with state changes uses both
+`layout-writing` and `code-writing`; their verification and reviewers are coordinated in one
+execution rather than treated as unrelated pipelines.
 
-**What:** Structured interview to capture requirements in human-readable form (in the user's language).
-
-**Process:**
-- Agent reads Project Knowledge files to understand the project
-- Scans codebase for relevant code, patterns, integration points
-- Runs 3 interview cycles with the user (general → code-informed → edge cases)
-- `interview-completeness-checker` agent verifies coverage
-- Creates `user-spec.md` from interview data → git commit draft
-- 2 validators run in parallel (up to 3 iterations):
-  - `userspec-quality-validator` — document structure, acceptance criteria testability
-  - `userspec-adequacy-validator` — solution feasibility, over/underengineering
-- Git commit after each validation round
-- User approves → git commit approval (status: approved)
-
-**Output:** `work/{feature}/user-spec.md` (status: approved)
-
-**Skill:** `user-spec-planning`
-
-### Step 2: Tech Spec — `/new-tech-spec`
-
-**What:** Technical architecture, decisions, testing strategy, implementation plan.
-
-**Process:**
-- Reads approved user-spec
-- Researches codebase, checks dependencies, uses Context7 for external libraries
-- Asks technical clarification questions
-- Copies tech-spec template, edits sections in place → `tech-spec.md` with architecture (including Shared Resources for heavy objects like ML models, DB pools), decisions, testing strategy, brief Implementation Tasks (scope only — AC and TDD are added during task-decomposition) → git commit draft
-- Implementation Tasks include Verify-smoke (executable checks: curl, python -c, docker) and Verify-user (manual UI/UX checks) fields where applicable
-- Last two waves are always Audit Wave (3 parallel auditors: code, security, test) and Final Wave (QA + deploy)
-- 5 validators run in parallel (up to 3 iterations):
-  - `skeptic` — detects non-existent files, functions, APIs (mirages)
-  - `completeness-validator` — bidirectional requirements traceability, over/underengineering, solution depth
-  - `security-auditor` — OWASP Top 10 review
-  - `test-reviewer` — test plan adequacy
-  - `tech-spec-validator` — template compliance, task quality, wave conflict detection
-- Git commit after each validation round
-- User approves → git commit approval (status: approved)
-
-**Output:** `work/{feature}/tech-spec.md` (status: approved)
-
-**Skill:** `tech-spec-planning`
-
-### Step 3: Task Decomposition — `/decompose-tech-spec`
-
-**What:** Break tech-spec into atomic task files.
-
-**Process:**
-- For each Implementation Task in tech-spec, `task-creator` agent copies task template and fills it (parallel)
-- Each task file expands brief tech-spec scope into: acceptance criteria, TDD anchor (from Testing Strategy), context files, skills, reviewers, wave, dependencies → git commit draft
-- 2 validators run in parallel (up to 3 iterations):
-  - `task-validator` — template compliance, content quality
-  - `reality-checker` — validates against actual codebase (file existence, feasibility)
-- Cross-task integration check: both validators re-run on all tasks together — catches shared resource conflicts, duplicate heavy resource init, hidden dependencies (max 2 extra iterations)
-- Git commit after each validation round
-- User approves → git commit approval
-
-**Output:** `work/{feature}/tasks/*.md` (validated)
-
-**Skill:** `task-decomposition`
-
-### Step 4: Implementation
-
-**Choose `/do-task` when:** single task, manual control, debugging, iterating on one piece.
-**Choose `/do-feature` when:** multiple tasks ready, standard feature work, want parallel execution.
-
-Two modes:
-
-#### Mode A: Single Task — `/do-task`
-
-One task per session. Suited for manual, controlled execution.
-
-**Process:**
-- Reads task file and all its Context Files
-- Loads skills specified in task (e.g. `code-writing`, `pre-deploy-qa`, `infrastructure-setup`)
-- Follows loaded skill workflow (TDD for code tasks, verification for QA tasks, etc.)
-- Git commit implementation (code + tests pass)
-- Runs reviewers specified in task (if any), up to 3 review iterations
-- Git commit after each round of review fixes (tests pass)
-- Writes entry to `decisions.md`, updates task status → done
-- Git commit status + decisions
-
-**Skill:** Loaded from task file (typically `code-writing` for code tasks)
-
-#### Mode B: Full Feature — `/do-feature`
-
-All tasks via agent teams. Team lead orchestrates waves of parallel work.
-
-**Process:**
-- Team lead reads tech-spec and all task files, builds execution plan
-- Checks `checkpoint.yml` — if resuming after context compaction, skips completed waves (uses decisions.md as source of truth for what actually completed)
-- Creates team via TeamCreate
-- Executes tasks wave by wave:
-  - Spawns one agent per task (parallel within wave)
-  - Each teammate: follows loaded skill workflow, runs smoke verification if task has Verify-smoke (before reviews), commits code (tests pass), sends diff to reviewers, fixes findings with commits per round (max 3 rounds), commits review reports
-  - Each teammate writes `decisions.md` entry
-  - Lead commits status updates (task frontmatter + decisions.md) after wave completes, updates `checkpoint.yml`
-- **Audit Wave** (always present): 3 auditors run in parallel (code-reviewer, security-auditor, test-reviewer) — review all feature code holistically. Issues found → lead spawns fixer agent, auditors become reviewers (max 3 fix rounds)
-- **Ad-hoc agents**: when lead needs work outside planned tasks (fixing audit findings, escalations), assigns matching skill + reviewers based on work type
-- **Final Wave**: QA (always), deploy + post-deploy (if applicable)
-- **Escalation**: after 3 failed fix rounds — stop, report to user, write decisions.md entry, wait for decision
-- User reviews results, team shuts down, `checkpoint.yml` deleted
-
-Tasks can be code, user-action, deploy, config, or verification. Task nature is determined by its skill + description, not a separate type field.
-
-**Skill:** `feature-execution`
-
-### Step 5: Done — `/done`
-
-**What:** Finalize feature, update project knowledge, archive.
-
-**Process:**
-- Reads user-spec, tech-spec, decisions.md
-- Updates affected Project Knowledge files (architecture.md, patterns.md, deployment.md, etc.)
-- Moves `work/{feature}/` → `work/completed/{feature}/`
-- Commits changes
-
-**Skill:** Loads `documentation-writing` skill for PK update rules
-
----
-
-## Project Structure
-
-### Dual Runtime: Claude Source, Codex Generated
-
-The methodology is maintained in two compatible runtimes:
+## Planned Feature Lifecycle
 
 ```text
-Claude source of truth:
-~/.claude/                 # global methodology source
-{project}/CLAUDE.md        # project instructions source
-{project}/.claude/**       # project knowledge and project skills source
-
-Codex generated runtime:
-~/.codex/**                # generated global Codex runtime
-{project}/AGENTS.md        # generated project instructions
-{project}/.codex/**        # generated project Codex runtime
+user-spec-planning → explicit approval → new task: implement the approved spec
+→ verified implementation commit → documentation-writing feature finalization
 ```
 
-Rules:
-- Edit Claude files by default: `~/.claude/**`, `CLAUDE.md`, `.claude/**`.
-- Do not manually edit generated Codex files unless explicitly debugging sync behavior.
-- After changing global methodology files, run:
+### Plan the Feature
+
+`user-spec-planning` owns the complete planning contract:
+
+1. Start or resume `work/{feature}/logs/userspec/interview.yml`. Ask 3–4 questions per batch and
+   run as many batches as the actual gaps require; there is no fixed number of interview cycles.
+2. Load the Project Knowledge router when it exists and follow only the routes relevant to the
+   feature. Missing Project Knowledge does not block feature planning.
+3. Once the intended outcome is clear enough, run `code-researcher`, write
+   `work/{feature}/code-research.md`, and use code evidence in the remaining interview.
+4. Run fresh `interview-completeness-checker` instances until the agreed scope has no substantive
+   requirements gap. A finding that would expand the feature returns to the user for a decision.
+5. Fill the bundled user-spec template in place. Keep its scaffold in English, write its content
+   in the user's language, preserve the executor instruction, and commit the draft.
+6. Validate every round in parallel with:
+   - `userspec-quality-validator` for document quality, coverage, and testable criteria;
+   - `userspec-adequacy-validator` for feasibility, proportionality, and architecture fit;
+   - `skeptic` for factual claims about the current codebase.
+7. Stop when all lanes are clean or after the third validation round. Obtain explicit user
+   approval, set the spec and interview statuses, commit the approval, and return the absolute
+   user-spec path for a new task.
+
+If the request contains independently valuable outcomes, planning proposes a split and waits for
+the user's choice. Different files, code layers, or execution skills alone do not require separate
+specs.
+
+### Implement the Feature
+
+The implementation task reads the approved `user-spec.md`, its executor instruction,
+`decisions.md` when present, and the relevant Project Knowledge routes. It then activates the
+skills required by the agreed work:
+
+- `code-writing` owns application behavior, data flow, APIs, state, validation, and code changes;
+- `layout-writing` owns markup, styling, typography, assets, responsive behavior, and visual
+  evidence;
+- `infrastructure-setup` owns Docker, hooks, CI/CD, delivery, release artifacts, monitoring,
+  recovery, and other operational changes;
+- `prompt-master` owns LLM prompt creation and revision;
+- `skill-master` owns skill creation and revision.
+
+Each executor reads context in proportion to the change, implements only agreed behavior, runs the
+smallest checks that establish the result, and coordinates every reviewer required by the active
+skills. When observable behavior changes, `test-master` selects the smallest reliable boundary
+that reproduces each meaningful risk; it does not create tests for artifacts with no contract to
+protect.
+
+The user-spec template requires the verified implementation to be committed separately before
+feature finalization. `decisions.md` receives only material decisions or deviations that need to
+survive the current context.
+
+### Finalize the Feature
+
+Feature finalization is an explicit mode of `documentation-writing`. The user identifies
+`work/{feature}/` and asks to finish or finalize it; no wrapper command file is required.
+
+The skill reads the spec, decisions, implementation, and relevant Git history; checks whether the
+feature is evidently complete; updates only affected durable Project Knowledge; removes active
+links that still treat the feature folder as current; moves it to
+`work/completed/{feature}/`; and commits the documentation and archive change. If Project
+Knowledge is missing, the documentation update is skipped but archival and finalization may still
+continue.
+
+This is the only documentation mode that reads feature artifacts by default, archives a feature,
+or creates a finalization commit. A normal documentation update or audit does none of those.
+
+## Ad-hoc Work
+
+A small direct request does not require a user-spec. The matching execution skill derives done
+from the request, reads only the needed project context, makes the focused change, and verifies it
+at the smallest useful boundary. Broader or cross-cutting work loads the contracts and Project
+Knowledge routes it actually affects.
+
+A risk, idea, edge case, or improvement discovered during implementation or review is a proposal,
+not new authorization. The executor may correct a local defect required for the agreed result; a
+change to behavior, scope, approach, state, fallback, validation, or material complexity returns
+to the user for a decision.
+
+## New Projects and Project Knowledge
+
+`project-initialization` creates a dual-runtime repository from its bundled template, preserves
+pre-existing files in the next available `old*` directory,
+configures Git hooks, creates the initialization commit, connects a private GitHub
+repository, creates `main` and `dev`, and leaves `dev` active. Reviewing or merging preserved
+`old*` files is separate work.
+
+The next step is initial Project Knowledge through `documentation-writing`. Its adaptive interview
+derives what it can from the repository, uses as many question batches as needed, obtains
+checkpoint agreement for project definition, architecture, and operations/experience, proposes a
+documentation topology when one is not already established, and writes durable facts in English.
+
+Project Knowledge lives in `.claude/skills/project-knowledge/`, whose `SKILL.md` is always the
+router. Use structure by context boundary rather than file size:
+
+- compact projects may keep Project, Architecture, Patterns, Deployment, and applicable UX or
+  domain facts in the router itself;
+- standard projects use the router plus `project.md`, `architecture.md`, `patterns.md`, and
+  `deployment.md`;
+- `ux-guidelines.md` or domain references are added only when they form independently useful
+  loading boundaries.
+
+`CLAUDE.md` remains a compact entrypoint: project identity, Project Knowledge route, backlog path,
+and default branch. It does not duplicate detailed project facts.
+
+## Sources of Truth
+
+### Approved User Spec
+
+`work/{feature}/user-spec.md` owns the agreed feature outcome, behavior, acceptance criteria,
+constraints, risks, accepted decisions, testing intent, and verification plan.
+
+### Project Knowledge
+
+Project Knowledge owns current durable project facts: purpose, architecture, project-specific
+patterns and business rules, deployment and operations, and applicable UX or domain guidance.
+Code owns implementation detail; configuration or registries own changing inventories; `work/`
+artifacts are evidence rather than owners of current project state.
+
+### Feature Folder
+
+```text
+work/{feature}/
+├── user-spec.md
+├── code-research.md
+├── decisions.md
+└── logs/
+    ├── userspec/
+    │   └── interview.yml
+    └── working/
+```
+
+Completed features move to `work/completed/{feature}/`. Planning templates, interview state, and
+the initializer script are bundled inside `user-spec-planning`; new-project templates are bundled
+inside `project-initialization`. There is no shared resource directory between skills.
+
+## Skill Responsibilities
+
+| Area | Owning skills |
+|---|---|
+| Feature requirements | `user-spec-planning` |
+| Project documentation and finalization | `documentation-writing` |
+| Application implementation | `code-writing` |
+| UI implementation and visual evidence | `layout-writing` |
+| Infrastructure and operations | `infrastructure-setup` |
+| Project creation | `project-initialization` |
+| Prompt authoring | `prompt-master` |
+| Skill authoring | `skill-master` |
+| Test selection and quality | `test-master` |
+| Code, layout, and security review criteria | `code-reviewing`, `layout-reviewing`, `security-auditor` |
+
+A skill package owns its optional `references/`, deterministic `scripts/`, and output
+`assets/`. This keeps dependencies portable through Claude-to-Codex conversion and public
+publication instead of relying on unrelated global directories.
+
+## Review Model
+
+Reusable methodology lives in skills. Dedicated reviewer agents add fresh isolated context, a
+bounded skeptical role, the minimum tools needed to inspect evidence, and a structured diagnostic
+result. They inherit the orchestrator's model without a caller override. They do not edit
+artifacts, design remediation, or decide whether work ships.
+
+A finding is valid only when it establishes a concrete location, observed evidence, violated
+requirement, realistic triggering conditions, and impact. A clean result is valid. The
+orchestrator evaluates every result and may apply a correction only when that exact correction is
+inside the user request, approved plan, or user-spec.
+
+Before the first review, the orchestrator selects the complete reviewer set required by all active
+skills. The set reviews the same revision in parallel as one wave; active skills do not create
+independent wave sequences. A correction that changes the reviewed result may trigger a fresh
+wave, subject to the owning workflow's limit. Implementation and writing workflows normally allow
+at most two waves; user-spec validation allows at most three rounds.
+
+Common reviewer ownership is:
+
+- every completed code implementation: `code-reviewer`;
+- layout implementation: `layout-reviewer` with prepared source and rendered evidence;
+- meaningful test-code changes: `test-reviewer` through `test-master`;
+- changed security boundaries or an explicit security request: `security-auditor`;
+- documentation edits: `documentation-reviewer`;
+- material infrastructure work or an explicit infrastructure review: `infrastructure-reviewer`;
+- prompt edits: `prompt-reviewer`;
+- skill changes: the applicable `skill-checker`, `skill-logic-reviewer`, and
+  `skill-simplicity-reviewer` lanes;
+
+After the final permitted wave, the executor runs applicable direct checks and reports remaining
+findings or required scope decisions instead of starting an unbounded review loop.
+
+## Working Principles
+
+- **Simplest sufficient process:** add a document, abstraction, rule, fallback, or coordination
+  layer only for a current requirement or demonstrated failure.
+- **Proportional context:** load the smallest context that preserves the affected contracts.
+- **One outcome, one user-facing specification:** split only independently valuable outcomes and
+  let the user decide.
+- **Evidence before action:** reviewer identity or severity never substitutes for evidence, and a
+  finding never expands authorization.
+- **Stable commits:** commit meaningful states such as a draft spec, approved spec, verified
+  implementation, or finalized documentation; do not force incidental state into a commit.
+
+## Claude and Codex Dual Runtime
+
+Allowlisted Claude files are the source of truth; Codex files are generated runtime artifacts:
+
+```text
+Claude source                                         Codex runtime
+~/.claude/skills/**                                   ~/.codex/skills/**
+~/.claude/agents/*.md                                 ~/.codex/agents/*.toml
+~/.claude/commands/*.md, when present                 ~/.codex/skills/source-command-*/**
+{project}/CLAUDE.md                                   {project}/AGENTS.md
+{project}/.claude/{skills,agents,commands}/**          {project}/.codex/{skills,agents}/**
+```
+
+Markdown sources and references are adapted for the target runtime. Other bundled resources such
+as scripts, assets, images, and data are copied byte-for-byte, so bundled executables must remain
+runtime-neutral and resolve resources relative to their own package.
+
+Conversion is manual. After changing an allowlisted global Claude source, run and review:
 
 ```bash
 ~/.claude/scripts/sync-to-codex.sh --apply
 ```
 
-- After changing project docs or project skills, run:
+After changing a project-local Claude source, run and review:
 
 ```bash
 ~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply
 ```
 
-- Project templates are dual-runtime. `/init-project` creates both Claude source files and Codex generated files.
-- `/init-project-knowledge`, `/done`, documentation-writing, project-planning, infrastructure-setup, deploy-pipeline, commands, and docs-related skills update `.claude/**` first, then sync to `.codex/**`.
-- Project pre-commit hooks run project sync automatically when staged `.claude/**` changes.
-- The global `~/.claude` pre-commit hook runs global sync automatically when staged methodology files change.
+Generated project `AGENTS.md` and `.codex/**` files are committed with their Claude sources,
+except host-local `.codex/.sync/**`. Global `~/.codex/**` is runtime state outside the
+`~/.claude` source repository and is not added to its commits. A reported conflict or validation
+error stops the workflow.
 
-MCP is handled separately because it is private runtime access, not documentation:
+Approved deletions or renames may leave managed generated outputs. Inspect the reported orphan
+list and prune only when every target corresponds to the approved source change; do not use prune
+as a routine sync option.
+
+### MCP Import
+
+MCP import is separate from skill conversion. The importer scans the global Claude MCP source and
+immediate projects under `~/projects`; `--project` adds roots rather than narrowing that host-wide
+scope. Preview changes on every host whose Codex runtime must change:
 
 ```bash
-~/.claude/scripts/sync-mcp-to-codex.sh --apply --prune
+~/.claude/scripts/sync-mcp-to-codex.sh
 ```
 
-This imports Claude/project `.mcp*.json` into local private Codex config (`~/.codex/mcp-imported/` and a managed block in `~/.codex/config.toml`). MCP configs, auth files, credentials, sessions, caches, and runtime state are never committed.
-
-### Project Knowledge — the Knowledge Base
-
-All project documentation lives in `.claude/skills/project-knowledge/references/`. This is the single source of truth for everything about the project.
-
-**4 core + optional files:**
-
-| File | Content |
-|------|---------|
-| `project.md` | Purpose, audience, core features, scope |
-| `architecture.md` | Tech stack, structure, dependencies, data model |
-| `patterns.md` | Code conventions, git workflow, testing, business rules |
-| `deployment.md` | Platform, env vars, CI/CD, monitoring |
-| `ux-guidelines.md` | UI language, tone, domain glossary (optional) |
-
-Features and roadmap live in the project backlog (external to PK).
-
-**CLAUDE.md is minimal.** It contains only the project name, a reference to project-knowledge skill, methodology overview, and default branch. All real information lives in Project Knowledge files.
-
-**`project-planning` skill** creates PK from scratch in new projects via interview (`/init-project-knowledge`).
-
-**`documentation-writing` skill** manages existing PK: audits, updates, checks consistency. `/done` command uses it to update PK after feature completion.
-
-### Work Items
-
-```
-work/{feature}/
-├── user-spec.md          # Requirements (user's language, for human)
-├── tech-spec.md          # Architecture (English, for agent)
-├── decisions.md          # Decisions made during implementation
-├── tasks/
-│   ├── 1.md              # Atomic task files
-│   ├── 2.md
-│   └── 3.md
-└── logs/                 # Working logs (interview, research, reviews)
-```
-
-Completed features are archived to `work/completed/{feature}/`.
-
-### Global Structure `~/.claude/`
-
-```
-~/.claude/
-├── skills/               # Skills (methodology, workflow, quality)
-├── agents/               # Agents (validators, reviewers, creators)
-├── commands/             # Slash commands
-├── shared/               # Templates, scripts, interview plans
-├── hooks/                # Automation hooks
-└── CLAUDE.md             # Global instructions
-```
-
----
-
-## Key Principles
-
-### Commit Strategy
-Commit after each step where the repository state is stable and meaningful. Not after every action — after each result.
-
-- **Planning stages** (user-spec, tech-spec, tasks): draft commit → validation round commits → approval commit
-- **Single task execution** (do-task): implementation commit (tests pass) → review fix commits (tests pass) → status/decisions commit
-- **Feature execution** (do-feature): teammates commit code + review fixes, lead commits statuses per wave
-- **Finalization** (done): single commit with PK updates + archive
-
-### Spec-Driven Development
-Write specifications before code. The hierarchy: User Spec → Tech Spec → Tasks → Code. Code starts only after specs are approved.
-
-### Validation at Every Stage
-- User spec: 2 validators (quality + adequacy)
-- Tech spec: 5 validators (skeptic + completeness + security + test + template/task-quality)
-- Tasks: 2 validators (template + reality)
-- Code: 3 reviewers (code + test + security) + smoke verification (API calls, library checks, MCP tools, local runs)
-- Audit Wave: 3 auditors (code + security + test) review all feature code holistically after implementation waves
-- QA tasks: pre-deploy QA (tests + acceptance criteria), post-deploy QA (verification on live environment)
-
-Max 3 fix iterations at each stage.
-
-### Project Knowledge as Single Source of Truth
-Project documentation = `.claude/skills/project-knowledge/references/`. CLAUDE.md stays minimal — just a pointer. The `/done` command updates PK after every feature. The `documentation-writing` skill audits PK for bloat and quality.
-
-### Just-In-Time Context
-Agent reads only what's needed for current task, not everything. Task files list their Context Files explicitly.
-
-### Context7 for Library Docs
-Agent uses Context7 MCP to fetch current library documentation instead of relying on training data. Used during tech-spec research and code implementation.
-
-### Checkpoint Recovery
-Feature execution persists state to `checkpoint.yml` after each wave. A `SessionStart(compact)` hook detects context compaction during long feature executions and injects recovery context — the lead resumes from the next pending wave using checkpoint + decisions.md as source of truth.
-
-### Language
-User-facing artifacts (chat, plans, interviews, validator summaries, user-spec, README) are written in the language the user writes in. Technical artifacts (tech-spec, tasks, code, code comments, AI prompts, internal logs) and document section headers stay in English as stable anchors for validators.
-
-The user's language is declared once in the instruction file — `~/.claude/CLAUDE.md` for Claude and `~/.codex/AGENTS.md` for Codex (or per-project `CLAUDE.md` / `AGENTS.md`). Skills and agents resolve "the language the user writes in" from that declaration rather than guessing per message, so output stays consistent even for subagents that never see the chat. To change the language, edit only that one line.
-
----
-
-## Skills Ecosystem
-
-
-### Planning Skills
-| Skill | Purpose |
-|-------|---------|
-| `project-planning` | New project: interview → project knowledge docs (project.md, architecture.md, etc.) |
-| `user-spec-planning` | Feature requirements: interview → user-spec.md |
-| `tech-spec-planning` | Architecture: research → tech-spec.md |
-| `task-decomposition` | Decompose tech-spec into atomic task files |
-
-### Execution Skills
-| Skill | Purpose |
-|-------|---------|
-| `code-writing` | TDD cycle: plan → tests → code → review |
-| `layout-writing` | Reproduce or adjust web layout from Figma, exports, screenshots, or an existing visual style |
-| `prompt-master` | LLM prompt engineering: write, improve, verify prompts |
-| `feature-execution` | Team lead dispatches agents by wave; teammates commit own code, lead commits statuses |
-| `pre-deploy-qa` | Pre-deploy acceptance testing: tests + acceptance criteria |
-| `post-deploy-qa` | Post-deploy verification on live environment via MCP tools |
-
-### Quality & Review Skills
-| Skill | Purpose |
-|-------|---------|
-| `code-reviewing` | 11-dimension code review methodology (incl. Resource Management) |
-| `security-auditor` | OWASP Top 10 security analysis |
-| `test-master` | Testing strategy: when to use which tests |
-
-### Meta Skills
-| Skill | Purpose |
-|-------|---------|
-| `methodology` | This skill — how the process works |
-| `documentation-writing` | Manage Project Knowledge files |
-| `skill-master` | Create and maintain quality skills |
-| `infrastructure-setup` | Framework init, Docker, pre-commit hooks, testing setup |
-| `deploy-pipeline` | CI/CD pipelines, deployment config, automated deploy |
-| `prompt-master` | Effective prompts for LLMs (also an execution skill) |
-| `skill-tester` | Full skill testing cycle: design scenarios, run, grade, report |
-
----
-
-## Agents
-
-Agents are isolated subprocesses with fresh context. They receive input, do one job, return structured output.
-
-### Validators (run during spec/task creation)
-- `userspec-quality-validator` — document quality and completeness
-- `userspec-adequacy-validator` — solution feasibility
-- `interview-completeness-checker` — interview coverage gaps
-- `tech-spec-validator` — template compliance
-- `skeptic` — detects mirages (non-existent files/functions/APIs)
-- `completeness-validator` — bidirectional requirements traceability, over/underengineering, solution depth
-- `task-validator` — task template compliance
-- `task-creator` — generates task files from tech-spec
-- `reality-checker` — validates tasks against codebase
-
-### Reviewers (run during/after code writing)
-- `code-reviewer` — code quality across 10 dimensions
-- `test-reviewer` — test quality analysis with concrete fixes
-- `layout-reviewer` — visual fidelity, responsive behavior, and layout regressions
-- `security-auditor` — OWASP Top 10, auth, input validation
-- `prompt-reviewer` — prompt quality against prompt-master principles
-- `documentation-reviewer` — project-knowledge quality against documentation-writing principles
-- `deploy-reviewer` — CI/CD pipeline and deployment configuration quality
-- `infrastructure-reviewer` — folder structure, Docker, pre-commit hooks, .gitignore
-
-### Research
-- `code-researcher` — codebase research for features (files, patterns, tests, integrations, risks)
-
-### QA
-- `pre-deploy-qa` — pre-deploy acceptance testing (tests + acceptance criteria)
-- `post-deploy-qa` — post-deploy verification on live environment (MCP tools, AVP)
-
-### Meta
-- `skill-checker` — validates skills against skill-master standards
-
----
-
-## Commands Reference
-
-| Command | Purpose |
-|---------|---------|
-| `/new-user-spec` | Interview → user-spec.md |
-| `/new-tech-spec` | Research → tech-spec.md |
-| `/decompose-tech-spec` | Tech-spec → task files |
-| `/do-task` | Execute single task with quality gates |
-| `/do-feature` | Execute all tasks via agent teams |
-| `/done` | Update PK, archive feature |
-| `/write-code` | Ad-hoc coding with TDD and reviews |
-| `/init-project` | Initialize new project with template, git, GitHub |
-| `/init-project-knowledge` | Fill all project documentation via project-planning skill |
-
----
-
-## Workflow Quick Start
-
-**New project:**
-`/init-project` → `/init-project-knowledge` (interview + fill all docs) → start features
-
-**New feature:**
-`/new-user-spec` → `/new-tech-spec` → `/decompose-tech-spec` → `/do-feature` or `/do-task` → `/done`
-
-**Ad-hoc coding (no spec):**
-`/write-code`
-
-To understand how a specific skill works internally, read its SKILL.md directly.
+Review sources, servers, and warnings; stop on any warning or validation error. Then apply with
+`--apply` and inspect every changed Codex configuration. The dry run does not report deletions
+performed by `--prune`, so normal changes do not use it. Treat removal or relocation as a separate
+maintenance operation: inspect the import manifest and every target before an explicit prune. No
+scheduler performs either conversion, and credentials never belong in commits.

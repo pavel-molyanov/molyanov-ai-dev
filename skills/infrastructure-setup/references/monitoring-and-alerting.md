@@ -1,0 +1,37 @@
+# Monitoring and Alerting Patterns
+
+Apply these rules to production health checks, scheduled operational checks, incident alerts, or
+an assessment of existing monitoring.
+
+## Placement and Health Signal
+
+- A public service has a meaningful health signal that distinguishes the intended service from an
+  unrelated responder and checks the dependencies necessary for its advertised readiness.
+- Important services normally use an outside-in check from the persistent host where project
+  agents or operations run, so a target-host failure remains visible. Project Knowledge records
+  that control host and monitoring location. If the agent host is not persistent or independent
+  enough, discuss another stable control location instead of pretending the check is reliable.
+- Reuse the project's existing monitoring and notification route rather than creating a parallel
+  system without a demonstrated need.
+
+## Incident Behavior and Routing
+
+- Treat transient failure according to the project's policy before opening an incident. Keep
+  incident state so one outage does not create an unbounded stream of duplicate messages.
+- Project Knowledge defines the check target, cadence, failures before alert, reminder policy,
+  recovery behavior, notification route name, and location of its runtime mapping. Do not impose
+  one project's noise policy or notification tool on another.
+- Keep tokens and raw recipient identifiers out of documentation, unit files, and logs. Store
+  secret values in protected runtime configuration and document only names and locations.
+
+## Installation and Evidence
+
+- Keep check and scheduler sources in the owning project. On a host using user systemd, install or
+  link only explicitly named units; never clear or replace the shared unit directory.
+- A new or changed installation is established by its schedule, intended user and paths, service
+  result, and journal evidence.
+- Initial alert installation or changed incident-state behavior needs a safe isolated failure
+  drill through the complete route. Keep drill state separate from live incidents and verify the
+  configured deduplication and recovery behavior without disrupting production.
+- A route-only change needs evidence that an alert reaches the intended destination; it does not
+  need to replay unchanged incident-state behavior.

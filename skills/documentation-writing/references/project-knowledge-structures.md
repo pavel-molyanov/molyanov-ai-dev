@@ -1,0 +1,70 @@
+# Project Knowledge Structures
+
+Choose structure by context boundaries, not document size. A separate file is useful when agents
+can work on that area without loading unrelated domains. Existing filled Project Knowledge keeps
+its current structure unless the user asks to reorganize it; missing, template, and partially
+filled initial documentation may adopt one of the structures below.
+
+## Compact
+
+Use one `project-knowledge/SKILL.md` for a small project whose durable context is best read together.
+Keep concise sections for:
+
+- Project
+- Architecture
+- Patterns
+- Deployment
+- UX/design and domain facts when applicable
+
+A section may simply state that it is not applicable, such as a local skills project with no
+deployment. The frontmatter description must route the project's real tasks to this skill.
+
+## Standard
+
+Use a router plus four core references for a coding or operational project:
+
+```text
+project-knowledge/
+├── SKILL.md
+└── references/
+    ├── project.md
+    ├── architecture.md
+    ├── patterns.md
+    └── deployment.md
+```
+
+The core owners are:
+
+- `project.md`: purpose, audience, problem, key capabilities, priorities, and scope boundaries.
+- `architecture.md`: stack and rationale, project structure, components, dependencies,
+  integrations, data flow, data model, and sensitive-data boundaries.
+- `patterns.md`: project-specific code and naming patterns, Git workflow, testing and verification,
+  security gates, and business rules.
+- `deployment.md`: platform and environments, the routine delivery path, direct-operation
+  boundary, agent or operations host, variable names, CI/CD triggers, production authorization,
+  rollback, monitoring placement and notification routing, and emergency recovery. State clearly
+  when the project is local-only or has no deployment rather than deleting this owner.
+
+Add `ux-guidelines.md` when the project has significant custom UI. It owns interface language,
+tone and copy patterns, domain glossary, design system, and accessibility.
+
+## Domain-Extended
+
+Start with the standard core, add `ux-guidelines.md` when applicable, then add domain references
+such as `bot.md`, `vault.md`, or `api.md` for independently useful areas. A domain file owns its
+component-specific behavior and gotchas; cross-cutting project, architecture, pattern, deployment,
+and UX facts remain in their core owners.
+
+Do not extract a domain merely because a file is long. Extract it when selective loading makes a
+real task cheaper or clearer without forcing the reader to reconstruct missing shared context.
+
+## Router Contract
+
+`project-knowledge/SKILL.md` is the entrypoint for every structure. After adding, deleting, or
+renaming documentation files, update its overview, links, and conditional task routing. Remove
+links to files that no longer exist and avoid duplicating the reference content in the router.
+
+For a new structure or an explicitly requested reorganization, present the exact files and the
+owner of each in one concise proposal. Ask the user to approve it or choose another option, and
+write only after the response. Once approved, preserve that topology during ordinary documentation
+updates.

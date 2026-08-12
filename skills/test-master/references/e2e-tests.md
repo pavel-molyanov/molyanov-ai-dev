@@ -1,82 +1,30 @@
 # E2E Testing Guide
 
-**For:** code-developer subagent when E2E tests are requested
+**For:** an implementation agent executing a user request or user-spec
 
 ## Table of Contents
-- [When E2E Tests Are Written](#when-e2e-tests-are-written)
-- [What to Test](#what-to-test)
-- [Test Structure](#test-structure)
+- [Journey Patterns](#journey-patterns)
+- [Full-Journey Structure](#full-journey-structure)
 - [What to Verify](#what-to-verify)
 - [Test Execution](#test-execution)
 - [Tooling](#tooling)
-- [Key Principles](#key-principles)
-- [Coverage Guidelines](#coverage-guidelines)
-- [Checklist Before Completion](#checklist-before-completion)
 
-## When E2E Tests Are Written
+## Journey Patterns
 
-### Defined in Tech Spec
-- Testing Requirements section specifies E2E needs
-- Lists critical user journeys to test
-
-### Agent Proposes E2E Tests
-Agent should propose E2E tests when:
-- Feature has **>5 tasks** (large, complex feature)
-- Feature touches **critical user flows** (auth, payment, core business logic)
-- Feature has **breaking changes** in API or UI
-- User explicitly requests E2E tests
-
-**When to propose:** After deploy to dev, before manual testing (new step in workflow)
-
-## What to Test
-
-### Top 3-5 Critical User Journeys
-**Not everything** - only the most important flows:
-
-**Examples:**
+Examples of complete user-facing journeys:
 - User registration → email verification → first login
 - User login → create order → checkout → payment → confirmation
 - Admin creates content → publishes → user views content
 - User uploads file → processes → downloads result
 - Integration: external service webhook → system processes → user notified
 
-### How to Identify Critical Flows
-Defined during User Spec phase:
-- What must work for business to function?
-- What would cause major problems if broken?
-- What do users do most frequently?
+## Full-Journey Structure
 
-## Test Structure
-
-### Full User Journey
 Test complete flow from start to finish:
 1. **Setup** - Clean database, create required data
 2. **User actions** - Simulate real user interactions (UI or API)
 3. **Verify results** - Check UI state, database, emails, side effects
 4. **Cleanup** - Reset system to clean state
-
-### E2E Test Phases
-
-**Phase 1: Authentication**
-- User registration/login
-- Session creation
-- Access to protected resources
-
-**Phase 2: Core Actions**
-- Main user actions (create, update, delete)
-- Form submissions
-- Navigation between pages
-
-**Phase 3: Business Logic**
-- Data processing
-- Calculations
-- Integrations with external services
-
-**Phase 4: Verification**
-- Success messages shown
-- Data persisted correctly
-- Emails/notifications sent
-- UI updates reflect changes
 
 ## What to Verify
 
@@ -97,81 +45,32 @@ Test complete flow from start to finish:
 - Emails sent to correct recipients
 - Webhooks triggered to external services
 - Files uploaded to storage
-- Payment processed (test mode)
+- Payment outcome and required outgoing interaction are correct
 
 ## Test Execution
 
 ### Where Tests Run
-- **Dev environment** - After deploy to dev
-- Real database (separate test DB)
-- Real integrations (test/sandbox mode)
+- Local or CI environment during implementation
+- Isolated test database or other controlled state
+- Sandbox modes or controlled test doubles for payments, email, and third-party APIs
+- A deployed dev/staging environment only for a separate short smoke check when required
 
 ### Test Speed
 - E2E tests are **slow** (minutes, not seconds)
 - Full browser automation takes time
-- Only test critical paths, not every edge case
 
 ### When to Run
-1. After deploy to dev
-2. Before manual testing (saves time on manual checks)
-3. Before merge to main (required for critical features)
-4. Optionally on CI/CD for critical flows
+1. During implementation after the protected behavior exists
+2. In CI before merge for the critical flows the project selects
+3. Locally while diagnosing failures when practical
 
 ## Tooling
 
-### Choose Framework Based on Tech Stack
-
-**Web Apps:**
-- Playwright (recommended, modern, fast)
-- Cypress (good for React/Vue)
-- Selenium (older, more complex)
-
-**API-First Apps:**
-- Postman/Newman (API testing)
-- REST Assured (Java)
-- SuperTest (Node.js)
-
-**Mobile Apps:**
-- Appium (cross-platform)
-- Detox (React Native)
-- XCTest/Espresso (native)
+Default: Playwright. If the project already has an E2E tool, use it.
 
 ### Configuration
 - Use headless mode for CI/CD (faster)
 - Use headed mode for debugging (see what's happening)
-- Set reasonable timeouts (30s for slow operations)
-- Take screenshots on failure (debugging)
-
-## Key Principles
-
-1. **Few tests, critical flows** - Only top 3-5 journeys, not every scenario
-2. **Test behavior, not UI details** - Don't test exact button position, test functionality
-3. **Resilient selectors** - Use data-testid or semantic selectors, not CSS classes
-4. **Realistic scenarios** - Simulate real user behavior, not edge cases
-5. **Independent tests** - Each test can run alone, no dependencies between tests
-6. **Clean state** - Reset database/system between tests
-
-## Coverage Guidelines
-
-### ✅ Write E2E for:
-- Complete user registration flow
-- Payment/checkout process
-- Critical business workflows (order creation, document processing)
-- Authentication and authorization flows
-
-### ❌ Don't write E2E for:
-- Edge cases (covered by unit tests)
-- Error handling (covered by integration tests)
-- Every form field validation (covered by unit tests)
-- Admin features rarely used (manual testing sufficient)
-
-## Checklist Before Completion
-
-- ✅ Top 3-5 critical flows identified (from Tech Spec or User Spec)
-- ✅ Each flow tests complete user journey (start to finish)
-- ✅ All tests pass on dev environment
-- ✅ Tests verify UI, database, and external systems
-- ✅ Tests are independent (can run in any order)
-- ✅ Tests have proper cleanup (reset state)
-- ✅ Screenshots/videos captured on failure (for debugging)
-
+- Set timeouts from the project's existing behavior and the operation under test
+- Use semantic or `data-testid` selectors rather than CSS classes or exact visual positions
+- Capture screenshots or videos on failure for debugging

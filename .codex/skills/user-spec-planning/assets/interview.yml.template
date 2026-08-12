@@ -1,0 +1,160 @@
+# User-spec planning interview
+# Questions and answers are preserved verbatim. Topic fields track what is known and still open.
+
+interview_metadata:
+  started: ""
+  last_updated: ""
+  status: "in_progress"  # in_progress | completed
+  can_resume: true
+
+conversation_history: []
+# Entry format:
+# - asked_at: "YYYY-MM-DD HH:MM:SS"
+#   topic_keys: ["user_problem", "success_criteria"]
+#   agent_questions: |
+#     Full question batch, verbatim.
+#   user_answer: |
+#     Full user answer, verbatim.
+
+general_understanding:
+  feature_name:
+    score: 0
+    value: ""
+    gaps: ["Confirm the feature name"]
+    required: true
+
+  feature_description:
+    score: 0
+    value: ""
+    gaps: ["Describe the intended outcome and context"]
+    required: true
+
+  work_type:
+    score: 0
+    value: ""
+    gaps: ["Determine feature, bug, or refactoring"]
+    required: true
+
+  user_problem:
+    score: 0
+    value: ""
+    gaps: ["Explain the problem and why it matters"]
+    required: true
+
+  target_users:
+    score: 0
+    value: ""
+    gaps: ["Identify affected users when applicable"]
+    required: false
+
+  success_criteria:
+    score: 0
+    value: ""
+    gaps: ["Define concrete observable success"]
+    required: true
+
+  constraints:
+    score: 0
+    value: ""
+    gaps: ["Identify applicable technical or business constraints"]
+    required: true
+
+  testing_strategy:
+    score: 0
+    value: ""
+    gaps: ["Map behavioral risks to the smallest reliable checks"]
+    required: true
+
+user_experience:
+  user_stories:
+    score: 0
+    value: ""
+    gaps: ["Describe applicable user flows step by step"]
+    required: true
+
+  acceptance_criteria:
+    score: 0
+    value: ""
+    gaps: ["Define testable acceptance criteria"]
+    required: true
+
+  edge_cases:
+    score: 0
+    value: ""
+    gaps: ["Resolve applicable boundaries and unusual scenarios"]
+    required: true
+
+  error_scenarios:
+    score: 0
+    value: ""
+    gaps: ["Resolve applicable failures and expected behavior"]
+    required: true
+
+  verification_strategy:
+    score: 0
+    value: ""
+    gaps: ["Define how the agent and user will verify the result"]
+    required: true
+
+  ui_ux_requirements:
+    score: 0
+    value: ""
+    gaps: ["Describe UI or UX requirements when applicable"]
+    required: false
+
+  risks:
+    score: 0
+    value: ""
+    gaps: ["Identify applicable risks and mitigations"]
+    required: true
+
+  technical_decisions:
+    score: 0
+    value: ""
+    gaps: ["Record material technical decisions and rejected alternatives"]
+    required: false
+
+  deploy_approach:
+    score: 0
+    value: ""
+    gaps: ["Describe deployment and required configuration when applicable"]
+    required: false
+
+  manual_user_actions:
+    score: 0
+    value: ""
+    gaps: ["List manual setup or launch actions when applicable"]
+    required: false
+
+integration:
+  integration_points:
+    score: 0
+    value: ""
+    gaps: ["Identify where the change fits in the current system"]
+    required: true
+
+  dependencies:
+    score: 0
+    value: ""
+    gaps: ["Identify relevant existing features, services, or libraries"]
+    required: false
+
+  technical_constraints:
+    score: 0
+    value: ""
+    gaps: ["Resolve applicable performance, security, or platform limits"]
+    required: false
+
+  data_requirements:
+    score: 0
+    value: ""
+    gaps: ["Describe required data, sources, destinations, and persistence"]
+    required: false
+
+  migration_needs:
+    score: 0
+    value: ""
+    gaps: ["Describe migration and compatibility needs when applicable"]
+    required: false
+
+notes: ""

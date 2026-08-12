@@ -41,10 +41,10 @@ Before coding, inspect the exact font family, weight, style, line height and wra
 For each source width:
 
 1. Export or crop the smallest stable source block that preserves the required positioning context.
-2. Render at the owning source viewport and capture the corresponding DOM block at the source block's dimensions.
-3. Run `overlay.mjs` on the two same-size images.
+2. Render at the owning source viewport and capture the corresponding DOM block at the source block's dimensions with `node scripts/capture.mjs --url <url> --project-root <repo> --viewports <explicit-WIDTHxHEIGHT-list> --selector <block> --out <new-child-path>` from the skill directory.
+3. Run `node scripts/overlay.mjs --reference <source-block.png> --actual <site-block.png> --project-root <repo> --out <new-child-path>` on the two same-size images. Use a new non-existent child of the workflow's temporary evidence root for every capture and overlay invocation.
 4. Open the source, site capture, `diff.png`, and optionally `overlay.png` as separate images.
-5. Correct confirmed differences and repeat only this block and its affected widths.
+5. Diagnose a size mismatch at the source node, DOM block, viewport, or crop boundary instead of resizing either image. Correct confirmed differences and repeat only this block and its affected widths.
 
 Pixel differences identify where images differ; they do not decide whether the design or composition is correct. Attribute residual text differences to browser rasterization only after family, style, weight, glyphs, line endings, wrapping, baselines, line height, and text-block bounds align and the remaining difference is confined to glyph edges.
 
@@ -56,7 +56,7 @@ Create the block checklist from the source, top to bottom:
 - for an existing page, map its major visual sections to DOM elements;
 - for one long source image, divide it sequentially into ordinary block images without creating a contact sheet.
 
-For every checklist item, locate the matching source region and DOM block, obtain a separate source image and site capture, compare the pair, correct confirmed differences, and mark the item checked. Page verification is complete only after every listed block was inspected at the chosen widths.
+For every checklist item, locate the matching source region and DOM block, obtain a separate source image and site capture, compare the pair, correct confirmed differences, and mark the item checked. Page verification is complete only after every listed block was inspected at the chosen widths. A long whole-page image or collage does not replace block-by-block coverage.
 
 Split a tall block by natural matching child blocks first. If none exist, capture it whole and run `overlay.mjs --parts 3`. Inspect all three sequential sets:
 
