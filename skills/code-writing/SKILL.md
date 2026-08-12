@@ -31,10 +31,10 @@ description: |
    scope decision. Otherwise choose the smallest safe implementation that follows project or
    framework conventions.
 5. Treat a new idea, risk, edge case, or opportunity discovered during implementation or review
-   as a proposal, not authorization. If acting on it adds behavior, validation, fallback, state,
-   abstraction, or material complexity outside the request or approved plan, explain it and get
-   the user's decision first. Correct autonomously only a local defect required to deliver the
-   already agreed behavior.
+   as a proposal, not authorization. A rare or unagreed scenario is a user decision even when its
+   correction looks local. Correct autonomously only an authorized local defect in agreed normal
+   behavior; ask before adding behavior, state, entities, contracts, dependencies, architecture,
+   or material complexity.
 
 ## Implement and Verify
 
@@ -75,18 +75,19 @@ Give each reviewer the user request or user-spec, applicable repository instruct
 evidence, every touched source file with relevant callers and dependencies, deleted or renamed
 file evidence, and generator/diff/validation evidence for mechanical artifacts.
 
-Evaluate every finding by its location, evidence, violated requirement, realistic conditions,
-and impact. Before changing files, evaluate the specific intended correction, not only the finding.
-Apply it automatically only when that exact correction is authorized by the user request,
-user-spec, or approved plan. A valid finding does not authorize additional work. If the correction
-has no clear authorization anchor or expands the agreed work, show the user the finding and proposed
-correction, then wait before editing. Reject unsupported findings with evidence and report unrelated
-findings without expanding the task.
+Review findings are diagnoses, not a work queue. Check the evidence and exact correction. Apply
+only an authorized local correction to agreed normal behavior. If the scenario is rare or
+unagreed, or the correction adds behavior, state, entities, contracts, dependencies, architecture,
+or material complexity, reject it with a short reason or ask the user before editing.
+`user_decision_required: false` does not replace this check. Reject unsupported findings with
+evidence and report unrelated findings without expanding the task.
 
-After wave 1, correct supported local defects inside the agreed behavior and rerun affected direct
-checks. If those corrections changed the reviewed result, launch wave 2 with the same complete
-reviewer set. Stop after a clean wave or when no authorized correction changes the result.
+After wave 1, correct only authorized local defects in agreed normal behavior that do not require a
+user decision, then rerun affected direct checks. If those corrections changed the reviewed result,
+launch wave 2 with the same complete reviewer set. Stop after a clean wave or when no authorized
+correction changes the result.
 
 After wave 2, do not launch another reviewer automatically. Correct remaining local defects only
-inside the agreed behavior, rerun the applicable direct checks, and hand off any remaining findings
-or required decisions about scope, behavior, approach, or material complexity.
+in agreed normal behavior and only when they do not require a user decision, rerun the applicable
+direct checks, and hand off any remaining findings or required decisions about scope, behavior,
+approach, or material complexity. Briefly explain rejected rare findings in the handoff.

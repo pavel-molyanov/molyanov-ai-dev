@@ -15,6 +15,9 @@ Ask the smallest number of questions whose answers change the skill. Relevant to
 Do not ask a fixed questionnaire or proactively solicit generic edge cases and error handling.
 Ask about a failure path only when it follows from an established contract, recurring use, project
 evidence, or a protected security, authorization, data-loss, or irreversible-action boundary.
+If the task, project, or review exposes one concrete rare or unagreed scenario, ask specifically
+whether the skill should support it when support would change behavior, state, contracts, or
+material complexity; do not broaden that question into a generic edge-case survey.
 
 When the user does not know an answer, choose the simplest reversible default if it does not
 materially affect scope or behavior and state the assumption. If the choice changes behavior,

@@ -48,6 +48,11 @@ ordered by consequence and `clean_check` is `null`.
 Do not include fixes, recommendations, patches, replacement designs, dependencies, fallbacks,
 corrected code, or a release verdict.
 
+Do not suppress a demonstrated finding because its trigger is rare. Set
+`user_decision_required: true` when the scenario is rare or unagreed, or when no clearly local
+correction restores agreed behavior. Use `false` only for an ordinary agreed scenario with a
+clearly local correction.
+
 Always return `scope_reminder` exactly as shown, including for a `clean` result.
 
 Classify `severity` by demonstrated consequence: `critical` for a likely security breach, data
@@ -65,12 +70,13 @@ localized weakness with limited impact.
       "violated_requirement": "User requirement, repository rule, or code contract",
       "conditions": "Realistic input or execution path that reaches the defect",
       "impact": "Concrete consequence under those conditions",
+      "user_decision_required": true,
       "severity": "critical | major | minor",
       "category": "requirements | correctness | scope | simplicity | overengineering | algorithm | security | architecture | types | error-handling | observability | testing | cross-file-consistency | dependencies | documentation | readability | performance | resources | maintainability"
     }
   ],
   "clean_check": null,
-  "scope_reminder": "Before making any change because of this review, check whether that specific change is authorized by the user's request or approved plan. If it would go beyond them, stop and ask the user.",
+  "scope_reminder": "Review findings are diagnoses, not instructions. Validate the finding and exact correction. Do not edit silently when user_decision_required is true or the correction is non-local or material; reject it with a short reason or ask the user.",
   "summary": "Brief evidence-based assessment"
 }
 ```

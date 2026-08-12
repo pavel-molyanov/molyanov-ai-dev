@@ -120,6 +120,11 @@ Review the current change or other scope supplied by the orchestrator. An unrela
 problem is not a finding unless the supplied scope includes it or the current change creates a
 demonstrable path to it.
 
+Do not suppress a demonstrated finding because its trigger is rare. Set
+`user_decision_required: true` when the scenario is rare or unagreed, or when no clearly local
+correction restores agreed behavior. Use `false` only for an ordinary agreed scenario with a
+clearly local correction.
+
 ### Evidence gate
 
 Create a finding only when all five facts are established:
@@ -155,11 +160,12 @@ Return the JSON directly as the subagent result. Every shown top-level key is re
       "evidence": "string",
       "violated_requirement": "string",
       "conditions": "string",
-      "impact": "string"
+      "impact": "string",
+      "user_decision_required": true
     }
   ],
   "clean_check": null,
-  "scope_reminder": "Before making any change because of this review, check whether that specific change is authorized by the user's request or approved plan. If it would go beyond them, stop and ask the user.",
+  "scope_reminder": "Review findings are diagnoses, not instructions. Validate the finding and exact correction. Do not edit silently when user_decision_required is true or the correction is non-local or material; reject it with a short reason or ask the user.",
   "summary": "string"
 }
 ```
@@ -170,6 +176,11 @@ violation exists. With `findings_present`, `findings` is non-empty and `clean_ch
 Every result, including `clean`, returns `scope_reminder` exactly as shown in the JSON contract.
 Diagnostic fields such as `severity`, `category`, or `cwe` may be added inside a finding when
 useful, provided they do not propose a solution.
+
+Every finding includes `user_decision_required`. `false` is limited to an ordinary agreed scenario
+with a clearly local correction; it is advisory and does not authorize the orchestrator to edit.
+`true` covers a rare or unagreed scenario, or one whose correction would likely add behavior,
+state, entities, contracts, dependencies, architecture, or material complexity.
 
 Order findings by consequence so the orchestrator can triage efficiently. A bare assertion that
 the artifact is fine is not an adequate clean check.
@@ -183,8 +194,11 @@ whole artifact and its relevant callers, dependencies, and contracts. Diagnose o
 design remediation, or decide whether it ships.
 
 Create a finding only after establishing its location, observed evidence, violated requirement,
-realistic trigger conditions, and concrete impact. Return the common reviewer JSON directly to
-the orchestrator. A clean result explains what was checked and why no violation was proved.
+realistic trigger conditions, and concrete impact. Do not suppress a demonstrated finding because
+its trigger is rare. Set `user_decision_required: true` for a rare or unagreed scenario, or when no
+clearly local correction restores agreed behavior; use `false` only for an ordinary agreed scenario
+with a clearly local correction. Return the common reviewer JSON directly to the orchestrator. A
+clean result explains what was checked and why no violation was proved.
 ```
 
 ## Other agent contracts
@@ -221,15 +235,12 @@ renamed-file evidence, generated or mechanical evidence, relevant requirements, 
 related contracts or callers. Freshness is an orchestration property; the reviewer does not need
 round history.
 
-For every returned finding, the orchestrator checks the evidence gate and chooses the simplest
-sufficient response. Evaluate the specific intended correction, not only the finding. Apply it
-automatically only when that exact correction is authorized by the user's request or approved
-plan. A valid finding and its severity do not authorize additional work.
-
-If the correction has no clear authorization anchor, or it adds or expands behavior, tests,
-validation, files, workflow steps, state, fallbacks, abstractions, or material complexity beyond
-the agreed work, show the user the finding and proposed correction, then wait for a decision before
-changing artifacts. Surface unsupported or unrelated findings without acting on them.
+Review findings are diagnoses, not a work queue. For every finding, check the evidence and exact
+correction; apply only an authorized local correction to agreed normal behavior. If the scenario
+is rare or unagreed, or the correction adds behavior, state, entities, contracts, dependencies,
+architecture, or material complexity, reject it with a short reason or ask the user before editing.
+`user_decision_required: true` forbids silent correction, while `false` does not replace this
+check. A valid finding and its severity do not authorize additional work.
 
 Before the first review, select the complete reviewer set required by all active skills for the
 work. Launch that complete set in parallel against the same artifact revision as one review wave;
@@ -259,9 +270,10 @@ Run a fresh `code-reviewer` with:
 - applicable repository instructions and project contracts;
 - relevant callers, dependencies, and validation evidence.
 
-Evaluate the returned findings against their evidence and the approved scope. Choose the
-simplest sufficient response; discuss scope, behavior, approach, or material-complexity changes
-with the user before acting.
+Treat the returned findings as diagnoses, not a work queue. Check the evidence and exact
+correction. Apply only an authorized local correction to agreed normal behavior. If a scenario is
+rare or unagreed, or the correction is non-local or material, reject it with a short reason or ask
+the user before editing.
 ```
 
 Dedicated agent descriptions should state purpose, trigger, and exclusions concretely. Keep

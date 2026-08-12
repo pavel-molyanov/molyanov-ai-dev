@@ -147,13 +147,12 @@ Do not search for `user-spec.md` or require it outside feature-finalization mode
    selected evidence boundary, related code and contracts, and the user's request. It returns its
    JSON result directly. Include reviewers required by other active skills in these same waves
    instead of starting a separate wave sequence.
-2. Evaluate each finding against its evidence; severity only orders attention. Before changing
-   documentation, evaluate the specific intended correction, not only the finding. Apply it
-   automatically only when that exact correction is authorized by the user request or approved
-   plan. A valid finding does not authorize additional work. If the
-   correction has no clear authorization anchor or expands the agreed work, show the user the
-   finding and proposed correction, then wait before editing. Surface unrelated pre-existing
-   defects without changing them.
+2. Review findings are diagnoses, not a work queue. Check the evidence and exact correction; apply
+   only an authorized local correction to agreed normal documentation. If the scenario is rare or
+   unagreed, or the correction adds behavior, state, entities, contracts, dependencies,
+   architecture, or material complexity, reject it with a short reason or ask the user before
+   editing. `user_decision_required: false` does not replace this check. Surface unrelated
+   pre-existing defects without changing them.
 3. If an accepted correction changes the reviewed documentation, run wave 2 with a fresh reviewer.
    Stop after a clean wave or when no authorized correction changes the documentation.
 4. After wave 2, do not launch another reviewer automatically. Make only remaining local corrections

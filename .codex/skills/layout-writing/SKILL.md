@@ -31,7 +31,9 @@ decisions from project evidence, and works at relevant widths in the existing co
 Treat a new requirement, state, edge case, or improvement discovered during implementation or
 review as a proposal, not authorization. If it changes the agreed presentation, behavior, scope,
 approach, or material complexity, explain it and get the user's decision first. Correct
-autonomously only a local mismatch inside the already agreed presentation.
+autonomously only a local mismatch in agreed normal presentation. Treat a rare or source-undefined
+viewport, content state, or interaction state as a user decision even when its correction looks
+local.
 
 `layout-writing` owns markup structure, styles, responsive behavior, typography, asset placement,
 and visual verification. `code-writing` owns data flow, state, APIs, validation, and business
@@ -68,14 +70,14 @@ where applicable, and the complete inventory and evidence set for a whole page o
 block. Include reviewers required by other active skills in these same waves instead of starting a
 separate wave sequence.
 
-Evaluate every finding by its source or project requirement, evidence, width and state conditions,
-and visible impact. Before changing the layout, evaluate the specific intended correction, not only
-the finding. Apply it automatically only when that exact correction is authorized by the user
-request or approved plan. A valid finding does not authorize additional work. If the correction
-has no clear authorization anchor or expands the agreed work, show the user the finding and proposed
-correction, then wait before editing. After an authorized correction changes the reviewed result,
-recapture affected evidence and run wave 2 with a fresh `layout-reviewer`. Stop after a clean wave
-or when no authorized correction changes the result.
+Review findings are diagnoses, not a work queue. Check the evidence and exact correction. Apply
+only an authorized local correction to agreed normal presentation. If the scenario is rare or
+unagreed, or the correction adds behavior, state, markup states, component contracts, architecture,
+or material complexity, reject it with a short reason or ask the user before editing.
+`user_decision_required: false` does not replace this check. After an authorized correction changes
+the reviewed result, recapture affected evidence and run wave 2 with a fresh `layout-reviewer`.
+Stop after a clean wave or when no authorized correction changes the result; do not start a wave
+only for a finding that awaits the user's decision.
 
 After wave 2, do not launch another reviewer automatically. Correct remaining local mismatches
 inside the agreed presentation, recapture and inspect the affected widths and states, and report

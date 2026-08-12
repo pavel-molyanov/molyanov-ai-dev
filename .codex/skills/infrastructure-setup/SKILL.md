@@ -46,6 +46,9 @@ it.
 - Discuss the situation with the user when material information is missing or contradictory, an
   action can affect production, users, data, secrets, or neighboring projects, the safe result is
   uncertain, the current setup appears wrong, or the intended response expands the request.
+- Treat a rare or unagreed operational scenario as a user decision even when its correction looks
+  local. Ask before adding or changing delivery, recovery, monitoring, isolation, persistent state,
+  infrastructure entities, dependencies, architecture, or material complexity.
 - Apply only the topic rules relevant to the request; these are conventions, not a required setup
   sequence.
 
@@ -107,12 +110,12 @@ incident behavior, notification routing, installation, and drills.
   facts, and run wave 2 with a fresh `infrastructure-reviewer`. Stop after a clean wave or when no
   authorized correction changes the result. Include reviewers required by other active skills in
   these same waves instead of starting a separate wave sequence.
-- Before changing infrastructure in response to a finding, evaluate the specific intended
-  correction, not only the finding. Apply it automatically only when that exact correction is
-  authorized by the user request or approved plan. A valid finding does not authorize additional
-  work. If the correction has no clear authorization anchor or expands the agreed work, show the
-  user the finding and proposed correction, then wait before editing. Report unsupported or
-  unrelated findings without acting on them.
+- Review findings are diagnoses, not a work queue. Check the evidence and exact correction. Apply
+  only an authorized local correction to agreed normal operation. If the scenario is rare or
+  unagreed, or the correction adds delivery, recovery, monitoring, isolation, persistent state,
+  infrastructure entities, dependencies, architecture, or material complexity, reject it with a
+  short reason or ask the user before editing. `user_decision_required: false` does not replace
+  this check. Report unsupported or unrelated findings without acting on them.
 - After wave 2, do not launch another reviewer automatically. If a remaining local correction is
   made inside the agreed change, verify its affected boundary directly and refresh durable Project
   Knowledge facts. Report any remaining risks or required user decisions.

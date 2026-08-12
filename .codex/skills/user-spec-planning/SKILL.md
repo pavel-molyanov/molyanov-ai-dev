@@ -85,17 +85,22 @@ Testing depth follows behavior and risk. Record concrete observable checks and t
 reliable unit, integration, E2E, build, lint, render, smoke, or manual boundary that can reproduce
 each applicable risk.
 
+Do not survey hypothetical edge cases. When research or review establishes one concrete rare or
+unagreed scenario, ask whether the feature should support it before adding requirements. Record the
+question and answer in `conversation_history` and update the relevant topic's `score`, `value`, and
+`gaps`. If accepted, add the behavior to the requirements and acceptance criteria; if declined,
+record it as an explicit limitation or out-of-scope decision.
+
 ### 3. Check Interview Completeness
 
 Launch a fresh `interview-completeness-checker` with the feature path and intended scope. It reads
 the interview, code research, and relevant Project Knowledge and returns the common reviewer JSON
 directly.
 
-Before acting on any reviewer finding, evaluate the specific intended response, not
-only the finding. Apply it automatically only when that exact response is authorized by the user
-request or agreed feature scope. A valid finding does not authorize additional work. If the response
-has no clear authorization anchor or expands the agreed task, show the user the finding and proposed
-response, then wait before changing artifacts or adding requirements.
+Review findings are diagnoses, not a work queue. Check the evidence and exact response. Apply only
+an authorized local correction to agreed requirements. For `user_decision_required: true`, ask one
+concrete question and record the answer through the existing interview loop before changing
+artifacts or adding requirements. A `false` value does not replace this check.
 
 Use supported findings to ask targeted questions for gaps inside the agreed task. Run a fresh
 checker after the answers are recorded, and draft only after it returns `clean`.
@@ -130,7 +135,8 @@ Supply the complete inputs required by each agent. All reviewers may inspect cod
 acceptable when independently supported evidence falls within more than one lane.
 
 Deduplicate overlapping supported findings and apply accepted corrections. User-spec decisions
-remain with the user.
+remain with the user. For a demonstrated finding with `user_decision_required: true`, ask the user
+and record the answer through the existing interview loop before changing the specification.
 
 - If all three results are `clean`, validation ends immediately.
 - If accepted findings were fixed after rounds 1 or 2, commit

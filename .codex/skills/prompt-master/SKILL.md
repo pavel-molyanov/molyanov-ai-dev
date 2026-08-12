@@ -68,12 +68,13 @@ model self-critique as a source of hypotheses, not as proof that a revision is b
 
 Run no more than two review waves. After creating or changing a prompt, run wave 1 with a fresh
 `prompt-reviewer`. Supply the prompt location, required result and output contract, input sources,
-trust boundaries, model capabilities, and callers. Before changing the prompt, evaluate the
-specific intended correction, not only the finding. Apply it automatically only when that exact
-correction is authorized by the user request or approved plan. A valid finding does not authorize
-additional work. If the correction has no clear authorization anchor or expands the agreed work,
-show the user the finding and proposed correction, then wait before editing. Include reviewers
-required by other active skills in these same waves instead of starting a separate wave sequence.
+trust boundaries, model capabilities, and callers. Review findings are diagnoses, not a work queue.
+Check the evidence and exact correction; apply only an authorized local correction to agreed normal
+behavior. If the scenario is rare or unagreed, or the correction adds behavior, state, entities,
+contracts, dependencies, architecture, or material complexity, reject it with a short reason or ask
+the user before editing. `user_decision_required: false` does not replace this check. Include
+reviewers required by other active skills in these same waves instead of starting a separate wave
+sequence.
 
 If an authorized fix changes the prompt, run wave 2 with a fresh reviewer against the revised
 version. Stop after a clean wave or when no authorized correction changes the prompt. After wave 2,

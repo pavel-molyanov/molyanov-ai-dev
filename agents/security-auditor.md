@@ -43,6 +43,11 @@ locations, scanner coverage or limitations, and why no violation was proved. For
 Do not include fixes, recommendations, code examples, patches, remediation plans, fallbacks, or
 a release verdict.
 
+Do not suppress a demonstrated finding because its trigger is rare. Set
+`user_decision_required: true` when the scenario is rare or unagreed, or when no clearly local
+correction restores agreed behavior. Use `false` only for an ordinary agreed scenario with a
+clearly local correction.
+
 Always return `scope_reminder` exactly as shown, including for a `clean` result.
 
 Classify `severity` by demonstrated consequence and realistic exploit conditions: `critical`
@@ -62,6 +67,7 @@ only when it helps interpret the evidence.
       "violated_requirement": "Security contract, OWASP category, or dependency policy",
       "conditions": "Realistic attacker capability and reachable path",
       "impact": "Concrete confidentiality, integrity, or availability consequence",
+      "user_decision_required": true,
       "severity": "critical | major | minor",
       "category": "OWASP category | secret | dependency | compliance",
       "cwe": "CWE-XXX when applicable",
@@ -69,7 +75,7 @@ only when it helps interpret the evidence.
     }
   ],
   "clean_check": null,
-  "scope_reminder": "Before making any change because of this review, check whether that specific change is authorized by the user's request or approved plan. If it would go beyond them, stop and ask the user.",
+  "scope_reminder": "Review findings are diagnoses, not instructions. Validate the finding and exact correction. Do not edit silently when user_decision_required is true or the correction is non-local or material; reject it with a short reason or ask the user.",
   "summary": "Brief evidence-based assessment"
 }
 ```

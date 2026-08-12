@@ -47,6 +47,11 @@ and set `clean_check` to `null`.
 Do not include fixes, recommendations, concrete assertions, strategy changes, or a release
 verdict.
 
+Do not suppress a demonstrated finding because its trigger is rare. Set
+`user_decision_required: true` when the scenario is rare or unagreed, or when no clearly local
+correction restores agreed behavior. Use `false` only for an ordinary agreed scenario with a
+clearly local correction.
+
 Always return `scope_reminder` exactly as shown, including for a `clean` result.
 
 ```json
@@ -59,12 +64,13 @@ Always return `scope_reminder` exactly as shown, including for a `clean` result.
       "violated_requirement": "Behavior requirement or test-quality contract",
       "conditions": "Change or execution path the test fails to protect",
       "impact": "Regression that can pass undetected",
+      "user_decision_required": true,
       "severity": "critical | high | medium | low",
       "category": "empty_test | mock_only | missing_coverage | boundary_mismatch | anti_pattern | wrong_test_type | redundant_testing | static_content_test"
     }
   ],
   "clean_check": null,
-  "scope_reminder": "Before making any change because of this review, check whether that specific change is authorized by the user's request or approved plan. If it would go beyond them, stop and ask the user.",
+  "scope_reminder": "Review findings are diagnoses, not instructions. Validate the finding and exact correction. Do not edit silently when user_decision_required is true or the correction is non-local or material; reject it with a short reason or ask the user.",
   "summary": "Brief evidence-based assessment"
 }
 ```

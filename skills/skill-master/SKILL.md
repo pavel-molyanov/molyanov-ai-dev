@@ -40,6 +40,11 @@ established contract, or a security, authorization, data-loss, or irreversible-a
 requires it. Do not add required actions, checks, state, or branches for behavior the agent can
 already handle, and do not re-check immediately visible results.
 
+Correct a local defect only when it restores agreed normal behavior. Treat a rare or unagreed
+scenario, or a correction that adds behavior, state, entities, contracts, dependencies,
+architecture, or material complexity, as a user decision; after the decision, encode the chosen
+behavior or omit special handling.
+
 ## Skill Types
 
 There are two types of skills based on how they guide Claude's work.
@@ -288,12 +293,11 @@ or references. Run all three in parallel for a new skill or a major rewrite. Do 
 unaffected lane merely to satisfy ceremony.
 
 Provide the user scope, touched artifacts, relevant references and contracts, and validation
-evidence. Before changing a skill in response to a finding, evaluate the specific intended
-correction, not only the finding. Apply it automatically only when that exact correction is
-authorized by the user request or approved plan. A valid finding does not authorize additional
-work. If the correction has no clear authorization anchor or expands the agreed work, show the user
-the finding and proposed correction, then wait before editing. Surface unsupported or unrelated
-findings without acting on them. Follow
+evidence. Review findings are diagnoses, not a work queue. Check the evidence and exact correction;
+apply only an authorized local correction to agreed normal behavior. If the scenario is rare or
+unagreed, or the correction adds behavior, state, entities, contracts, dependencies, architecture,
+or material complexity, reject it with a short reason or ask the user before editing. A
+`user_decision_required: false` value does not replace this check. Follow
 [agents.md → Orchestrator responsibilities](references/agents.md).
 
 All three are defined under `~/.claude/agents/` and have skill-master preloaded.
