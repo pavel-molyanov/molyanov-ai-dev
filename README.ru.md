@@ -190,4 +190,4 @@ Claude-определения находятся в `agents/*.md`, нативн�
 
 ## Лицензия и автор
 
-[MIT](LICENSE) © [Павел Молянов](https://github.com/pavel-molyanov)
+[MIT](LICENSE) © [Павел Молянов](https://molyanov.ru)

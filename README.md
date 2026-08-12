@@ -192,4 +192,4 @@ removed.
 
 ## License and author
 
-[MIT](LICENSE) © [Pavel Molyanov](https://github.com/pavel-molyanov)
+[MIT](LICENSE) © [Pavel Molyanov](https://molyanov.ru)
