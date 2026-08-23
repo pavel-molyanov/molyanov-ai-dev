@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+SOURCE_PATHS=(CLAUDE.md skills agents commands)
+CODEX_PATHS=(.codex/skills .codex/agents)
+
+if git diff --cached --quiet -- "${SOURCE_PATHS[@]}"; then
+  ./scripts/sync-to-codex.sh \
+    --claude-root "$REPO_ROOT" \
+    --codex-root "$REPO_ROOT/.codex" \
+    --check-drift \
+    --no-diff
+  exit 0
+fi
+
+if ! git diff --quiet -- "${SOURCE_PATHS[@]}" ||
+  [ -n "$(git ls-files --others --exclude-standard -- "${SOURCE_PATHS[@]}")" ]; then
+  echo "pre-commit: Claude source changes are only partially staged. Stage all intended source changes first." >&2
+  exit 1
+fi
+
+./scripts/sync-to-codex.sh \
+  --claude-root "$REPO_ROOT" \
+  --codex-root "$REPO_ROOT/.codex" \
+  --apply
+git add -A -- "${CODEX_PATHS[@]}"
+
+./scripts/sync-to-codex.sh \
+  --claude-root "$REPO_ROOT" \
+  --codex-root "$REPO_ROOT/.codex" \
+  --check-drift \
+  --no-diff
