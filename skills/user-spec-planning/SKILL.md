@@ -1,11 +1,10 @@
 ---
 name: user-spec-planning
 description: |
-  Creates user-spec.md through adaptive interview, codebase research, and three-lane validation.
-
-  Use when: "сделай юзер спек", "проведи интервью для юзер спека",
-  "создай юзерспек", "user spec", "detailed planning", "хочу продумать фичу",
-  "опиши требования к фиче", "сделай описание фичи", "/new-user-spec"
+  Plans a feature, bug fix, or refactor as work/{feature}/user-spec.md through an adaptive
+  interview, code research, and validation before implementation. Use whenever requirements should
+  be agreed before coding, including thinking a feature through, describing what it must do,
+  resuming an existing spec, and "/new-user-spec".
 ---
 
 # User Spec Planning
@@ -78,17 +77,14 @@ reference and continue the normal workflow.
 4. Complete user-flow and integration topics, including applicable failures, edge cases,
    constraints, deployment, manual user actions, and verification.
 5. Make a final pass over every remaining required gap. If a later answer exposes a factual code
-   gap, run focused code research again.
+   gap, or the current side of a changed process is still unclear, run focused code research again.
 
-Testing depth follows behavior and risk. Record concrete observable checks and the smallest
-reliable unit, integration, E2E, build, lint, render, smoke, or manual boundary that can reproduce
-each applicable risk.
+Interview for observable evidence that would prove important behavior works, but do not ask the
+user to choose test types or design a testing strategy. Derive the smallest reliable automated,
+agent, visual, smoke, or manual check later from the behavior, project, and risk.
 
-Do not survey hypothetical edge cases. When research or review establishes one concrete rare or
-unagreed scenario, ask whether the feature should support it before adding requirements. Record the
-question and answer in `conversation_history` and update the relevant topic's `score`, `value`, and
-`gaps`. If accepted, add the behavior to the requirements and acceptance criteria; if declined,
-record it as an explicit limitation or out-of-scope decision.
+Deepen relevant edge cases and error scenarios, including scenarios the user has not considered
+even when the corresponding interview topic already meets the completion threshold.
 
 ### 3. Check Interview Completeness
 
@@ -96,26 +92,36 @@ Launch a fresh `interview-completeness-checker` with the feature path and intend
 the interview, code research, and relevant Project Knowledge and returns the common reviewer JSON
 directly.
 
-Review findings are diagnoses, not a work queue. Check the evidence and exact response. Apply only
-an authorized local correction to agreed requirements. For `user_decision_required: true`, ask one
-concrete question and record the answer through the existing interview loop before changing
-artifacts or adding requirements. A `false` value does not replace this check.
-
-Use supported findings to ask targeted questions for gaps inside the agreed task. Run a fresh
-checker after the answers are recorded, and draft only after it returns `clean`.
+If it returns findings, validate and deduplicate them. Explain what the current requirements say and
+how the feature would work, then what the checker found, what it can cause, whether you agree and
+why, and what you recommend. Present the targeted questions or exact local corrections in one batch.
+Apply only what the user explicitly answers or approves; a `user_decision_required: false` value is
+not approval. Record requirement answers through the interview loop, then run a fresh checker.
+Draft only after it returns `clean`.
 
 ### 4. Draft the User Spec
 
 Fill the initialized `work/{feature}/user-spec.md` in place without replacing a substantive
-existing document. Preserve its executor instruction and replace every placeholder.
-Keep the template-provided scaffold in English; write the specification content in the user's
-language.
+existing document. Preserve its executor instruction, replace every placeholder, and remove only
+the conditional sections that the template says do not apply. Keep headings in English and write
+the specification content in the user's language.
 
 - `What We Are Building` is self-contained without the interview.
 - `Why` states concrete user value.
-- Acceptance criteria describe observable, testable results.
-- Include agreed outcomes, constraints, material decisions, testing, and acknowledged
-  limitations; omit exploratory tangents that do not clarify a decision.
+- For a changed process, `What Changes` gives one coherent current-to-target description per
+  process. Keep detailed target behavior out of this section and omit the section for net-new work.
+- `How It Should Work` owns the target business logic. Organize it by meaningful user actions or
+  system events when useful, and include only applicable checks, branches, state changes, results,
+  and important failure or stop behavior. Match the detail to the task instead of forcing a fixed
+  scenario schema.
+- `Scope and Constraints` makes both included and excluded work explicit.
+- Preserve substantive risks and accepted product or technical decisions; omit those sections when
+  they add no useful information.
+- `Acceptance and Verification` pairs meaningful observable results with concrete checks at the
+  smallest reliable boundary. Do not repeat every implementation detail or require user checks the
+  agent can perform.
+- Include agreed outcomes and acknowledged limitations; omit exploratory tangents that do not
+  clarify the implementation contract.
 
 Commit: `draft(userspec): create user-spec for {feature}`.
 
@@ -123,19 +129,23 @@ Commit: `draft(userspec): create user-spec for {feature}`.
 
 For every validation round, launch all three fresh reviewers in parallel:
 
-- `userspec-quality-validator` — document completeness, clarity, acceptance criteria,
+- `userspec-quality-validator` — document completeness, behavioral clarity, verification,
   contradictions, and template compliance;
 - `userspec-adequacy-validator` — feasibility, proportionality, architecture fit, insufficient or
   unnecessary complexity, and demonstrably simpler existing approaches;
 - `skeptic` — factual claims about current files, symbols, dependencies, integrations, and
   behavior.
 
-Supply the complete inputs required by each agent. All reviewers may inspect code; overlap is
-acceptable when independently supported evidence falls within more than one lane.
+Resolve `assets/user-spec.md.template` from this loaded skill and supply that exact path to
+`userspec-quality-validator` together with the feature path. Supply the complete remaining inputs
+required by each agent. All reviewers may inspect code; overlap is acceptable when independently
+supported evidence falls within more than one lane.
 
-Deduplicate overlapping supported findings and apply accepted corrections. User-spec decisions
-remain with the user. For a demonstrated finding with `user_decision_required: true`, ask the user
-and record the answer through the existing interview loop before changing the specification.
+If reviewers return findings, validate and deduplicate them. Explain what the current specification
+says and how the feature would work, then what reviewers found, what it can cause, whether you agree
+and why, and what you recommend. Present exact proposed corrections in one batch and apply only what
+the user explicitly approves. Record requirement answers through the interview loop before changing
+the specification; `user_decision_required: false` is not approval.
 
 - If all three results are `clean`, validation ends immediately.
 - If accepted findings were fixed after rounds 1 or 2, commit

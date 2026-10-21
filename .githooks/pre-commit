@@ -5,14 +5,10 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
 SOURCE_PATHS=(CLAUDE.md skills agents commands)
-CODEX_PATHS=(.codex/skills .codex/agents)
+CODEX_PATHS=(AGENTS.md .agents/skills .codex/agents .codex/skills .codex/AGENTS.md)
 
 if git diff --cached --quiet -- "${SOURCE_PATHS[@]}"; then
-  ./scripts/sync-to-codex.sh \
-    --claude-root "$REPO_ROOT" \
-    --codex-root "$REPO_ROOT/.codex" \
-    --check-drift \
-    --no-diff
+  python3 .githooks/sync-runtime.py --check
   exit 0
 fi
 
@@ -22,14 +18,10 @@ if ! git diff --quiet -- "${SOURCE_PATHS[@]}" ||
   exit 1
 fi
 
-./scripts/sync-to-codex.sh \
-  --claude-root "$REPO_ROOT" \
-  --codex-root "$REPO_ROOT/.codex" \
-  --apply
-git add -A -- "${CODEX_PATHS[@]}"
-
-./scripts/sync-to-codex.sh \
-  --claude-root "$REPO_ROOT" \
-  --codex-root "$REPO_ROOT/.codex" \
-  --check-drift \
-  --no-diff
+python3 .githooks/sync-runtime.py --apply
+for path in "${CODEX_PATHS[@]}"; do
+  if [ -e "$path" ] || [ -L "$path" ] || git ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
+    git add -A -- "$path"
+  fi
+done
+python3 .githooks/sync-runtime.py --check

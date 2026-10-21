@@ -1,14 +1,21 @@
 ---
 name: code-reviewing
 description: |
-  Reviews code against the user request, project conventions, cross-file contracts, and applicable quality risks.
-  Use when: "проверь код", "code review", "ревью кода", "review this code", "check code quality"
+  Code review criteria: what counts as a finding across requirements, scope and simplicity,
+  cross-file contracts, architecture, failure handling, types, security, performance,
+  dependencies, and tests. Use whenever code or a diff is reviewed or its quality judged,
+  including a commit, branch, PR, or another agent's implementation.
 ---
 
 # Code Reviewing
 
 Function length, nesting, broad types, hardcoded values, repeated resource construction, or
 multiple mocks are signals to investigate; they are not defects by themselves.
+
+Within this lane, the reviewer may challenge correctness, complexity, architecture, or the chosen
+approach and propose a useful simpler or stronger alternative. Ground findings and proposals in
+the request, project evidence, or a concrete consequence; unsupported preference is not useful,
+and a clean result is complete.
 
 ## Contents
 
@@ -37,8 +44,8 @@ multiple mocks are signals to investigate; they are not defects by themselves.
   adds indirection or generality without a current use.
 - Evaluate the chosen algorithm against realistic input size and project constraints. Report
   avoidable complexity only when an existing project capability or direct requirement proves it
-  unnecessary and the current choice has a demonstrable consequence; do not prescribe a
-  replacement, speculative optimization, or wholesale redesign.
+  unnecessary and the current choice has a demonstrable consequence. When useful, describe a
+  simpler or stronger alternative without turning speculative optimization into a finding.
 - Treat handling for extremely unlikely cases as a defect only when no requirement or realistic
   path justifies it and the extra handling materially complicates the normal path.
 
@@ -145,10 +152,10 @@ Apply when behavior or tests changed.
 - Tests should protect the changed behavior at the smallest reliable boundary.
 - Look for missing meaningful branches, failures, validation, transformations, and specified
   edge cases.
-- Do not require tests for freely editable UX copy, presentation-only markup or styles, or
-  mechanical changes with no observable contract to protect. Content, configuration, markup,
-  styles, and accessors remain testable when they implement an explicit user, accessibility,
-  protocol, or project contract.
+- Do not require tests for LLM-produced results.
+- Freely editable UX copy, presentation-only markup or styles, and mechanical changes with no
+  observable contract to protect normally have no test subject. They become testable when they
+  implement an explicit user, accessibility, protocol, or project contract.
 - A mock is a problem when the test verifies its own setup or replaces all meaningful behavior,
   not when an arbitrary count is reached.
 - Checking a call is valid when the interaction itself is the observable contract, such as

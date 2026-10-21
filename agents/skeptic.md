@@ -54,14 +54,15 @@ Do not suppress a demonstrated finding because its trigger is rare. Set
 correction restores agreed behavior. Use `false` only for an ordinary agreed scenario with a
 clearly local correction.
 
-Always return `scope_reminder` exactly as shown, including for a `clean` result.
-
 ```json
 {
   "status": "findings_present",
   "findings": [
     {
       "location": "user-spec section and confirming code location",
+      "finding": "What factual mismatch the review found",
+      "reasoning": "Why the mismatch matters to the proposed implementation",
+      "alternative": null,
       "evidence": "Claim and observed current-code evidence",
       "violated_requirement": "Factual accuracy requirement or current code contract",
       "conditions": "Implementation path that relies on the inaccurate claim",
@@ -72,7 +73,6 @@ Always return `scope_reminder` exactly as shown, including for a `clean` result.
     }
   ],
   "clean_check": null,
-  "scope_reminder": "Review findings are diagnoses, not instructions. Validate the finding and exact correction. Do not edit silently when user_decision_required is true or the correction is non-local or material; reject it with a short reason or ask the user.",
   "summary": "Brief evidence-based assessment"
 }
 ```

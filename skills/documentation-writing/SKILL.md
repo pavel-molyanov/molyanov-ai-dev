@@ -1,15 +1,11 @@
 ---
 name: documentation-writing
 description: |
-  Creates and maintains project documentation in .claude/skills/project-knowledge/:
-  interview, initial Project Knowledge, audit, edit, consistency, and feature finalization.
-
-  Use when: "заполни документацию проекта", "опиши проект", "создай Project Knowledge",
-  "проведи интервью по проекту", "проверь документацию", "обнови документацию",
-  "аудит документации", "plan a new project", "fill project documentation",
-  "check docs", "audit documentation", "update docs"
-
-  For reading docs or explaining concepts, read project-knowledge skill directly.
+  Creates and maintains a project's Project Knowledge and its CLAUDE.md entrypoint: initial
+  project interview, updates after a change, audits and consistency checks, and feature
+  finalization. Use whenever project documentation is created, updated, audited, or finalized,
+  including documenting what a change did and finishing a feature. Only reading existing docs
+  uses the project's project-knowledge skill.
 ---
 
 # Documentation Management
@@ -30,20 +26,25 @@ preserve the filled structure already in use.
 ## Manual Project Documentation Sync
 
 Project documentation source of truth is Claude-side: `CLAUDE.md` and `.claude/**`.
-Codex-side `AGENTS.md` and `.codex/**` are generated runtime files.
-No scheduled job performs this conversion. The agent that changes the Claude source runs the
-matching command immediately and reviews the generated result before finishing the task.
-
-After changing a project `CLAUDE.md` or any project-local `.claude/**` file, immediately run:
+Codex-side `AGENTS.md`, `.agents/skills/**`, and `.codex/**` are generated runtime files. No
+scheduled job performs this conversion. The agent that changes the Claude source runs the matching
+command immediately and reviews the generated result before finishing the task:
 
 ```bash
 ~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply
 ```
 
-If sync reports a conflict, stop and report it. Commit generated project `.codex/**` / `AGENTS.md`
-changes with their Claude sources, except `.codex/.sync/**`, which is host-local runtime state.
-When an approved deletion or rename produces `orphaned managed` outputs, verify that every reported
-path corresponds to that approved source change, then remove those generated leftovers with:
+Do not edit generated Codex files directly. If one was changed, move the intended content to its
+Claude source, discard the direct generated edit, and run the command above to regenerate Codex.
+
+Git hooks are fallback safety checks: pre-commit repeats sync, rejects partial staging, and stages
+generated outputs; pre-push checks for remaining drift and blocks the push when it finds any.
+
+If sync reports a conflict or validation error, stop and report it. Commit generated project
+`.agents/skills/**`, `.codex/**`, and `AGENTS.md` changes with their Claude sources, except
+`.codex/.sync/**`, which is host-local runtime state. When an approved deletion or rename produces
+`orphaned managed` outputs, verify that every reported path corresponds to that approved source
+change, then remove those generated leftovers with:
 
 ```bash
 ~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply --prune --confirm-delete
@@ -54,17 +55,16 @@ If the orphan list contains anything else, stop and report it instead of pruning
 ### Nested Agent Workspaces
 
 Some projects keep an agent workspace under a subdirectory (for example
-`nested-workspace/.claude/**`) while the repository root exposes selected skills or
-agents through symlinks in root `.claude/**`. In that case, sync both levels:
+`nested-workspace/.claude/**`) while the repository root exposes selected skills or agents through
+symlinks in root `.claude/**`. In that case, sync both levels:
 
 ```bash
 ~/.claude/scripts/sync-to-codex.sh --project "$PWD/nested-workspace" --apply
 ~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply
 ```
 
-Verify root `.codex/agents` / `.codex/skills` include every root-exposed agent or skill. A
-generated file existing only inside the nested workspace is not enough when the root runtime
-must invoke it. Treat `.codex/.sync/**` as host-local evidence: do not commit or synchronize it.
+Verify root `.codex/agents` / `.agents/skills` include every root-exposed agent or skill. A generated
+file existing only inside the nested workspace is not enough when the root runtime must invoke it.
 
 ## Documentation Principles
 
@@ -142,22 +142,17 @@ Do not search for `user-spec.md` or require it outside feature-finalization mode
 
 ## Documentation Review
 
-1. Run no more than two review waves. After documentation edits, run wave 1 with a fresh
-   `documentation-reviewer` with no model override. Give it the complete touched documents, the
-   selected evidence boundary, related code and contracts, and the user's request. It returns its
-   JSON result directly. Include reviewers required by other active skills in these same waves
-   instead of starting a separate wave sequence.
-2. Review findings are diagnoses, not a work queue. Check the evidence and exact correction; apply
-   only an authorized local correction to agreed normal documentation. If the scenario is rare or
-   unagreed, or the correction adds behavior, state, entities, contracts, dependencies,
-   architecture, or material complexity, reject it with a short reason or ask the user before
-   editing. `user_decision_required: false` does not replace this check. Surface unrelated
-   pre-existing defects without changing them.
-3. If an accepted correction changes the reviewed documentation, run wave 2 with a fresh reviewer.
-   Stop after a clean wave or when no authorized correction changes the documentation.
-4. After wave 2, do not launch another reviewer automatically. Make only remaining local corrections
-   inside the requested documentation change, run the applicable direct checks and manual sync, and
-   show the user any remaining findings or required decisions.
+After documentation edits, run one review stage with a fresh `documentation-reviewer` with no model
+override. Give it the complete touched documents, selected evidence boundary, related code and
+contracts, the user's request, and a short explanation of what changed, how the documented result
+works, why this approach was chosen, deliberate limits, and assumptions. Include reviewers required
+by other active skills in this same stage.
+
+The reviewer verifies that explanation against the evidence and may challenge the documentation's
+accuracy, structure, complexity, or chosen approach and propose an alternative within its lane.
+After it returns, apply no finding and do not repeat the review automatically. Explain what you
+changed and how the documented result works, then what the reviewer found, what it can cause,
+whether you agree and why, and what you recommend. Wait for the user's approval before editing.
 
 ## Feature Finalization Mode
 

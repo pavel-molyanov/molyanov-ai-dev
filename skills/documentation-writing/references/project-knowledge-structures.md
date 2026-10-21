@@ -17,7 +17,8 @@ Keep concise sections for:
 - UX/design and domain facts when applicable
 
 A section may simply state that it is not applicable, such as a local skills project with no
-deployment. The frontmatter description must route the project's real tasks to this skill.
+deployment. Keep the router's frontmatter description as in the project-initialization template;
+it is the same for every project because the skill loads only inside its own project.
 
 ## Standard
 

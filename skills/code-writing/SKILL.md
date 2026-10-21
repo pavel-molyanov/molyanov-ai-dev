@@ -1,16 +1,13 @@
 ---
 name: code-writing
 description: |
-  Guides code implementation through proportional context reading, focused changes, verification, and fresh reviews.
-  Use whenever code needs to be written — from a short ad-hoc edit to a full user-spec.
-
-  Use when: "напиши код", "закодь", "реализуй", "write code", "implement"
-
-  Do NOT use for pure layout from Figma, Claude Design, screenshots, or an existing visual
-  style ("сверстай", "подвинь блок", responsive) — use layout-writing instead.
-  Direct mixed layout + business-logic work uses both layout-writing and code-writing.
-
-  For creating a user-spec → user-spec-planning skill.
+  Guides implementing code changes: proportional context reading, approval before non-trivial
+  unplanned work, focused changes, the smallest sufficient checks, and fresh reviews. Use whenever
+  code is written or changed, from a one-line fix to an approved user-spec, including code edits
+  made as one step of a larger task.
+  Pure visual layout uses layout-writing (mixed layout and logic uses both); editing or rendering
+  video with Remotion uses the video and Remotion skills; agreeing requirements before coding uses
+  user-spec-planning.
 ---
 
 # Code Writing
@@ -27,9 +24,9 @@ description: |
    reusable code, and establish the smallest useful baseline check. Inspect generated, lock,
    snapshot, or other mechanical artifacts through their generator, relevant diff, and
    deterministic validation rather than an unhelpful full read.
-4. Discuss the approach before editing only when evidence exposes a substantive fork, risk, or
-   scope decision. Otherwise choose the smallest safe implementation that follows project or
-   framework conventions.
+4. Before editing non-trivial work not covered by an approved user-spec or user-approved plan,
+   briefly explain in simple user-facing language how the result will work end to end and why this
+   is the simplest sufficient approach, then wait for approval.
 5. Treat a new idea, risk, edge case, or opportunity discovered during implementation or review
    as a proposal, not authorization. A rare or unagreed scenario is a user decision even when its
    correction looks local. Correct autonomously only an authorized local defect in agreed normal
@@ -46,8 +43,9 @@ description: |
 3. Let straightforward code explain itself. Comment only when code cannot communicate the reason
    for a business rule, safety invariant, external constraint, compatibility workaround,
    deliberate tradeoff, or required ordering.
-4. When the change can alter observable behavior, apply `test-master` to select and run the
-   protecting tests. If it has no test subject, state that instead of creating artificial
+4. Apply `test-master` only to deterministic executable behavior or another explicit deterministic
+   contract. For LLM-produced results, presentation-only layout, or freely editable copy, use agent,
+   manual, or visual verification instead. If there is no test subject, do not create artificial
    assertions.
 5. Run the smallest supported lint, format, type, build, render, and user-requested checks that
    cover the change. Use a project-wide command only when it is the available entrypoint or the
@@ -55,39 +53,29 @@ description: |
 
 ## Run Fresh Reviews
 
-Run no more than two review waves. One wave launches the complete reviewer set selected for the
-implementation in parallel against the same revision. Use that same complete set in both waves.
-Include reviewers required by other active skills in these same waves instead of starting a
-separate wave sequence.
+After every completed implementation, launch one fresh review stage with the complete applicable
+reviewer set in parallel against the same revision. Include reviewers required by other active
+skills in that stage instead of starting a separate review sequence.
 
-After every completed implementation, include a fresh `code-reviewer` without a model override.
-Its review scope matches the change: a localized edit gets focused connected context; a broad
-change gets all affected contracts and architecture.
+Include a fresh `code-reviewer` without a model override. Its review scope matches the change: a
+localized edit gets focused connected context; a broad change gets all affected contracts and
+architecture.
 
 Also launch in parallel when applicable:
 
 - `security-auditor` when a security boundary changed or the user requested a security review.
 
 `test-master` owns the additional `test-reviewer` invocation when meaningful test code changed.
-Include that reviewer in every wave for this implementation.
+Include that reviewer in the same review stage.
 
 Give each reviewer the user request or user-spec, applicable repository instructions, validation
 evidence, every touched source file with relevant callers and dependencies, deleted or renamed
-file evidence, and generator/diff/validation evidence for mechanical artifacts.
+file evidence, generator/diff/validation evidence for mechanical artifacts, and a short explanation
+of what changed, how the result works, why this approach was chosen, deliberate limits, and
+assumptions. The reviewer verifies that explanation against the request, project evidence, and code
+rather than accepting it as fact.
 
-Review findings are diagnoses, not a work queue. Check the evidence and exact correction. Apply
-only an authorized local correction to agreed normal behavior. If the scenario is rare or
-unagreed, or the correction adds behavior, state, entities, contracts, dependencies, architecture,
-or material complexity, reject it with a short reason or ask the user before editing.
-`user_decision_required: false` does not replace this check. Reject unsupported findings with
-evidence and report unrelated findings without expanding the task.
-
-After wave 1, correct only authorized local defects in agreed normal behavior that do not require a
-user decision, then rerun affected direct checks. If those corrections changed the reviewed result,
-launch wave 2 with the same complete reviewer set. Stop after a clean wave or when no authorized
-correction changes the result.
-
-After wave 2, do not launch another reviewer automatically. Correct remaining local defects only
-in agreed normal behavior and only when they do not require a user decision, rerun the applicable
-direct checks, and hand off any remaining findings or required decisions about scope, behavior,
-approach, or material complexity. Briefly explain rejected rare findings in the handoff.
+After reviewers return, apply no finding and do not repeat the review automatically. Explain what
+you implemented and how it works, then what reviewers found, what it can cause, whether you agree
+and why, and what you recommend. Group related points, avoid internal process terms, and wait for
+the user's approval before editing.

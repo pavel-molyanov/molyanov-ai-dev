@@ -1,12 +1,10 @@
 ---
 name: methodology
 description: |
-  Explains the current AI-First development methodology: skill routing, Project Knowledge,
-  user-spec planning and execution, evidence-gated reviews, feature finalization, and the
-  Claude/Codex dual runtime.
-
-  Use when: "изучи методологию", "как работает пайплайн", "как делать фичи",
-  "как устроены скиллы", "how does the methodology work", "explain the workflow"
+  Explains the AI-First development methodology: which skill owns what, Project Knowledge,
+  user-spec planning and implementation, reviewer agents, feature finalization, new projects, and
+  the Claude/Codex dual runtime. Use whenever someone asks how the workflow, pipeline, or skill
+  system works, or which path or skill fits a piece of work.
 ---
 
 # AI-First Development Methodology
@@ -120,17 +118,17 @@ at the smallest useful boundary. Broader or cross-cutting work loads the contrac
 Knowledge routes it actually affects.
 
 A risk, idea, edge case, or improvement discovered during implementation or review is a proposal,
-not new authorization. The executor may correct a local defect required for the agreed result; a
-change to behavior, scope, approach, state, fallback, validation, or material complexity returns
-to the user for a decision.
+not new authorization. The executor may correct a local defect it finds during implementation or
+direct checks before review; a change to behavior, scope, approach, state, fallback, validation, or
+material complexity returns to the user for a decision. Reviewer findings also return to the user.
 
 ## New Projects and Project Knowledge
 
 `project-initialization` creates a dual-runtime repository from its bundled template, preserves
 pre-existing files in the next available `old*` directory,
 configures Git hooks, creates the initialization commit, connects a private GitHub
-repository, creates `main` and `dev`, and leaves `dev` active. Reviewing or merging preserved
-`old*` files is separate work.
+repository, and creates `main`, plus an active `dev` for software development. Reviewing or
+merging preserved `old*` files is separate work.
 
 The next step is initial Project Knowledge through `documentation-writing`. Its adaptive interview
 derives what it can from the repository, uses as many question batches as needed, obtains
@@ -205,18 +203,20 @@ publication instead of relying on unrelated global directories.
 Reusable methodology lives in skills. Dedicated reviewer agents add fresh isolated context, a
 bounded skeptical role, the minimum tools needed to inspect evidence, and a structured diagnostic
 result. They inherit the orchestrator's model without a caller override. They do not edit
-artifacts, design remediation, or decide whether work ships.
+artifacts or decide whether work ships. Within their lane they may challenge the chosen approach,
+complexity, or missing possibilities and propose alternatives. A clean result is valid.
 
-A finding is valid only when it establishes a concrete location, observed evidence, violated
-requirement, realistic triggering conditions, and impact. A clean result is valid. The
-orchestrator evaluates every result and may apply a correction only when that exact correction is
-inside the user request, approved plan, or user-spec.
+The orchestrator supplies the requirements, relevant artifacts and contracts, validation evidence,
+and a short explanation of the implementation. Reviewers verify that explanation as a claim rather
+than treating it as authority. The shared reviewer and orchestrator contract is owned by
+`skill-master/references/agents.md`.
 
 Before the first review, the orchestrator selects the complete reviewer set required by all active
-skills. The set reviews the same revision in parallel as one wave; active skills do not create
-independent wave sequences. A correction that changes the reviewed result may trigger a fresh
-wave, subject to the owning workflow's limit. Implementation and writing workflows normally allow
-at most two waves; user-spec validation allows at most three rounds.
+skills. The set reviews the same artifact revision in parallel as one review stage. After the
+reviewers return, the orchestrator explains their findings, its assessment, and its recommendation
+to the user without applying findings or automatically repeating the stage. Only explicit approval
+of specific changes starts a correction cycle. The separate user-spec validation process still
+allows at most three rounds.
 
 Common reviewer ownership is:
 
@@ -230,8 +230,8 @@ Common reviewer ownership is:
 - skill changes: the applicable `skill-checker`, `skill-logic-reviewer`, and
   `skill-simplicity-reviewer` lanes;
 
-After the final permitted wave, the executor runs applicable direct checks and reports remaining
-findings or required scope decisions instead of starting an unbounded review loop.
+Distinct stages that examine different artifacts or boundaries remain separate, such as the source
+and destination scans in public publication.
 
 ## Working Principles
 
@@ -247,41 +247,13 @@ findings or required scope decisions instead of starting an unbounded review loo
 
 ## Claude and Codex Dual Runtime
 
-Allowlisted Claude files are the source of truth; Codex files are generated runtime artifacts:
-
-```text
-Claude source                                         Codex runtime
-~/.claude/skills/**                                   ~/.codex/skills/**
-~/.claude/agents/*.md                                 ~/.codex/agents/*.toml
-~/.claude/commands/*.md, when present                 ~/.codex/skills/source-command-*/**
-{project}/CLAUDE.md                                   {project}/AGENTS.md
-{project}/.claude/{skills,agents,commands}/**          {project}/.codex/{skills,agents}/**
-```
-
-Markdown sources and references are adapted for the target runtime. Other bundled resources such
-as scripts, assets, images, and data are copied byte-for-byte, so bundled executables must remain
-runtime-neutral and resolve resources relative to their own package.
-
-Conversion is manual. After changing an allowlisted global Claude source, run and review:
-
-```bash
-~/.claude/scripts/sync-to-codex.sh --apply
-```
-
-After changing a project-local Claude source, run and review:
-
-```bash
-~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply
-```
-
-Generated project `AGENTS.md` and `.codex/**` files are committed with their Claude sources,
-except host-local `.codex/.sync/**`. Global `~/.codex/**` is runtime state outside the
-`~/.claude` source repository and is not added to its commits. A reported conflict or validation
-error stops the workflow.
-
-Approved deletions or renames may leave managed generated outputs. Inspect the reported orphan
-list and prune only when every target corresponds to the approved source change; do not use prune
-as a routine sync option.
+Claude-side instructions, skills, agents, and commands are the source of truth. The editing agent
+runs Claude-to-Codex sync during its work and reviews the generated runtime; no background timer
+does this. Repository hooks are safety checks: pre-commit repeats sync and stages generated
+outputs, while pre-push blocks drift. Commit project outputs with their sources, and deliver global
+outputs through the separate `~/.codex` repository first. Project Codex skills are generated into
+`<project>/.agents/skills`, where Codex discovers them; agents, `config.toml`, and the sync manifest
+stay in `.codex/`.
 
 ### MCP Import
 
@@ -296,5 +268,5 @@ scope. Preview changes on every host whose Codex runtime must change:
 Review sources, servers, and warnings; stop on any warning or validation error. Then apply with
 `--apply` and inspect every changed Codex configuration. The dry run does not report deletions
 performed by `--prune`, so normal changes do not use it. Treat removal or relocation as a separate
-maintenance operation: inspect the import manifest and every target before an explicit prune. No
-scheduler performs either conversion, and credentials never belong in commits.
+maintenance operation: inspect the import manifest and every target before an explicit prune.
+Credentials never belong in commits.

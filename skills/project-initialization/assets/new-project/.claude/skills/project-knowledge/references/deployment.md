@@ -1,5 +1,16 @@
 # Deployment & Operations
 
+- [Purpose](#purpose)
+- [Deployment Platform](#deployment-platform)
+- [Access Information](#access-information)
+- [Operating Model](#operating-model)
+- [Environment Variables](#environment-variables)
+- [Deployment Triggers](#deployment-triggers)
+- [Required Manual Release Steps](#required-manual-release-steps)
+- [Emergency Recovery](#emergency-recovery)
+- [Environments](#environments)
+- [Monitoring & Observability](#monitoring--observability)
+
 ## Purpose
 Deployment process, infrastructure, and production operations for AI agents.
 

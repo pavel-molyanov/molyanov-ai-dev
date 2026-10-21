@@ -4,15 +4,11 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
-MANAGED_PATHS=(CLAUDE.md skills agents commands .codex/skills .codex/agents)
+MANAGED_PATHS=(CLAUDE.md skills agents commands AGENTS.md .agents/skills .codex/agents .codex/skills .codex/AGENTS.md)
 
 if [ -n "$(git status --porcelain=v1 -- "${MANAGED_PATHS[@]}")" ]; then
   echo "pre-push: Claude/Codex files have uncommitted changes. Commit them before pushing." >&2
   exit 1
 fi
 
-exec ./scripts/sync-to-codex.sh \
-  --claude-root "$REPO_ROOT" \
-  --codex-root "$REPO_ROOT/.codex" \
-  --check-drift \
-  --no-diff
+exec python3 .githooks/sync-runtime.py --check

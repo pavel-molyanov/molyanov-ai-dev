@@ -1,5 +1,10 @@
 # Patterns & Conventions
 
+- [Project-Specific Code Patterns](#project-specific-code-patterns)
+- [Git Workflow](#git-workflow)
+- [Testing & Verification](#testing--verification)
+- [Business Rules](#business-rules)
+
 Coding conventions, development workflow, and project-specific practices.
 
 ---

@@ -58,11 +58,11 @@ This keeps methodology in one source while giving repeated reviews fresh context
 
 - The skill owns reusable domain criteria, checklists, decision rules, and defect examples.
 - The reviewer agent owns the fresh skeptical stance, bounded input, evidence to read,
-  reviewer-specific hunt or investigation mechanics, evidence gate, diagnostic result fields,
-  direct JSON response, and the exclusions against editing, designing remediation, or making a
-  release decision.
-- The caller owns launching a fresh reviewer, supplying complete context, evaluating returned
-  findings, and deciding whether an authorized correction is warranted.
+  reviewer-specific investigation, direct JSON response, and the freedom to challenge the chosen
+  approach or describe a useful alternative within its lane. It does not edit or make the release
+  decision.
+- The caller owns supplying complete context and explaining the review to the user. It applies no
+  reviewer finding until the user explicitly approves the specific change.
 
 Do not repeat the preloaded skill's reusable domain rules in the agent. When a necessary reusable
 rule exists only in an agent, move it into the preloaded skill before removing the agent copy;
@@ -106,46 +106,26 @@ reviewer merely to persist its report.
 
 ## Reviewer contract
 
-A reviewer, validator, checker, scanner, or critic diagnoses the supplied artifact. It does not
-modify the artifact, design remediation, or decide whether the result may ship.
+A reviewer, validator, checker, scanner, or critic reviews the supplied artifact within its
+defined lane. It does not modify the artifact or decide whether the result may ship.
 
 ### Stance and scope
 
 The reviewer starts from fresh context, reads the complete artifact, and follows relevant
-callers, dependencies, standards, and contracts. It actively tries to disprove correctness but
-does not assume a defect must exist. Accuracy matters more than the number of findings, and a
-clean result is a complete valid outcome.
+callers, dependencies, standards, and contracts. Apply the preloaded lane rather than a generic
+preference. The reviewer may report defects, unnecessary complexity, a simpler approach, a
+different design, an improvement, or an additional scenario when relevant to that lane. Explain
+what was observed and why it matters; unsupported preference is not useful. Accuracy matters more
+than finding count, and a clean result is complete.
 
-Review the current change or other scope supplied by the orchestrator. An unrelated pre-existing
-problem is not a finding unless the supplied scope includes it or the current change creates a
-demonstrable path to it.
+The orchestrator also supplies a short implementation explanation when reviewing completed work:
+what changed, how the result works, why this approach was chosen, deliberate limits, and
+assumptions. Treat this explanation as a claim to verify against the request, project evidence, and
+artifact, not as authority. For a review of existing material, use the review goal and known usage
+instead of inventing an implementation rationale.
 
-Do not suppress a demonstrated finding because its trigger is rare. Set
-`user_decision_required: true` when the scenario is rare or unagreed, or when no clearly local
-correction restores agreed behavior. Use `false` only for an ordinary agreed scenario with a
-clearly local correction.
-
-### Evidence gate
-
-Create a finding only when all five facts are established:
-
-1. `location` identifies the concrete artifact location.
-2. `evidence` states the observed fact, not a suspicion.
-3. `violated_requirement` names the requirement, standard, or contract that the fact violates.
-4. `conditions` describes a realistic path that triggers the problem in the current project.
-5. `impact` states the concrete consequence under those conditions.
-
-If any fact is missing, continue investigating or omit the finding. A personal preference, a
-possible improvement, a best practice without demonstrated consequence, hypothetical future
-expansion, a scenario without an established trigger path, or defensive machinery proposed
-"just in case" does not pass the gate. A false finding is a reviewer error.
-
-### No solution or release verdict
-
-Findings describe the violated property, not how to fix it. Reviewer output contains no fix,
-recommendation, patch, remediation plan, replacement architecture, new dependency, fallback,
-corrected code example, or release verdict. Severity and other domain fields are diagnostic
-metadata only; they do not decide the orchestrator's action.
+A finding gives the caller enough context to explain the relevant behavior, what is wrong or
+proposed, when it matters, and the consequence.
 
 ### Required JSON shape
 
@@ -157,48 +137,29 @@ Return the JSON directly as the subagent result. Every shown top-level key is re
   "findings": [
     {
       "location": "string",
-      "evidence": "string",
-      "violated_requirement": "string",
-      "conditions": "string",
-      "impact": "string",
-      "user_decision_required": true
+      "finding": "what the reviewer found or proposes",
+      "reasoning": "why it matters within this review lane",
+      "alternative": "optional simpler or stronger approach, or null"
     }
   ],
   "clean_check": null,
-  "scope_reminder": "Review findings are diagnoses, not instructions. Validate the finding and exact correction. Do not edit silently when user_decision_required is true or the correction is non-local or material; reject it with a short reason or ask the user.",
   "summary": "string"
 }
 ```
 
 `status` is exactly `clean` or `findings_present`. With `clean`, `findings` is empty and
-`clean_check` briefly lists the checked risks, related locations, and why no demonstrated
-violation exists. With `findings_present`, `findings` is non-empty and `clean_check` is `null`.
-Every result, including `clean`, returns `scope_reminder` exactly as shown in the JSON contract.
-Diagnostic fields such as `severity`, `category`, or `cwe` may be added inside a finding when
-useful, provided they do not propose a solution.
-
-Every finding includes `user_decision_required`. `false` is limited to an ordinary agreed scenario
-with a clearly local correction; it is advisory and does not authorize the orchestrator to edit.
-`true` covers a rare or unagreed scenario, or one whose correction would likely add behavior,
-state, entities, contracts, dependencies, architecture, or material complexity.
-
-Order findings by consequence so the orchestrator can triage efficiently. A bare assertion that
-the artifact is fine is not an adequate clean check.
+`clean_check` briefly states what was checked. With `findings_present`, `findings` is non-empty and
+`clean_check` is `null`. Domain agents may add evidence, conditions, impact, severity, category, or
+other useful fields. Order findings by importance.
 
 ### Reviewer skeleton
 
 ```markdown
-You are a fresh skeptical {lane} reviewer. Try to disprove that the supplied {artifact}
-satisfies {standard}, while treating accuracy rather than finding count as the goal. Read the
-whole artifact and its relevant callers, dependencies, and contracts. Diagnose only: do not edit,
-design remediation, or decide whether it ships.
-
-Create a finding only after establishing its location, observed evidence, violated requirement,
-realistic trigger conditions, and concrete impact. Do not suppress a demonstrated finding because
-its trigger is rare. Set `user_decision_required: true` for a rare or unagreed scenario, or when no
-clearly local correction restores agreed behavior; use `false` only for an ordinary agreed scenario
-with a clearly local correction. Return the common reviewer JSON directly to the orchestrator. A
-clean result explains what was checked and why no violation was proved.
+You are a fresh skeptical {lane} reviewer. Review the complete supplied {artifact} and relevant
+context within that lane. You may challenge correctness, complexity, the chosen approach, or
+missing possibilities and describe a useful alternative. Explain what you found and why it matters;
+do not edit or decide whether the result ships. Treat the implementer's explanation as a claim to
+verify, not as authority. Return the common reviewer JSON directly. A clean result is valid.
 ```
 
 ## Other agent contracts
@@ -231,29 +192,20 @@ An automation agent reports actions and observable results:
 ## Orchestrator responsibilities
 
 The orchestrator launches a fresh reviewer instance with the touched artifacts, deleted or
-renamed-file evidence, generated or mechanical evidence, relevant requirements, and complete
-related contracts or callers. Freshness is an orchestration property; the reviewer does not need
-round history.
+renamed-file evidence, generated or mechanical evidence, relevant requirements, related contracts
+or callers, validation evidence, and the short implementation explanation described above. Select
+the complete reviewer set required by the active skills and launch it in parallel against one
+artifact revision.
 
-Review findings are diagnoses, not a work queue. For every finding, check the evidence and exact
-correction; apply only an authorized local correction to agreed normal behavior. If the scenario
-is rare or unagreed, or the correction adds behavior, state, entities, contracts, dependencies,
-architecture, or material complexity, reject it with a short reason or ask the user before editing.
-`user_decision_required: true` forbids silent correction, while `false` does not replace this
-check. A valid finding and its severity do not authorize additional work.
+After reviewers return, apply no finding and do not repeat the review automatically. Explain what
+you changed and how it works, then what reviewers found, what it can cause, whether you agree and
+why, and what you recommend. Group related points, avoid internal process terms, and wait for the
+user's approval before editing.
 
-Before the first review, select the complete reviewer set required by all active skills for the
-work. Launch that complete set in parallel against the same artifact revision as one review wave;
-active skills do not start independent wave sequences. After a correction, use a fresh wave when
-another review is warranted so every included reviewer re-reads the whole artifact without
-anchoring on prior findings. A workflow may set a stricter limit, but it must not require more than
-three automatic review waves. Stop earlier when a wave is clean or no authorized correction changes
-the reviewed result.
-
-After the final permitted wave, do not launch another reviewer automatically. Correct remaining
-local defects only within the agreed behavior, run the applicable direct checks, and return any
-remaining findings or required scope and design decisions to the user. A new explicit user request
-may start another review cycle; do not persist or reconstruct wave counts across separate runs.
+One review wave applies to one review stage. Preserve distinct stages that examine different
+artifacts or boundaries, such as a source scan followed by a destination scan. The orchestrator may
+still correct problems it finds through implementation, direct checks, or diff inspection before
+review begins.
 
 If a durable log is needed, the orchestrator stores the returned JSON. The reviewer does not need
 a report path or write permission.
@@ -268,12 +220,13 @@ Run a fresh `code-reviewer` with:
 - touched, deleted, renamed, generated, and mechanical artifacts;
 - the user request or user-spec;
 - applicable repository instructions and project contracts;
-- relevant callers, dependencies, and validation evidence.
+- relevant callers, dependencies, and validation evidence;
+- a short explanation of what changed, how the result works, why this approach was chosen,
+  deliberate limits, and assumptions.
 
-Treat the returned findings as diagnoses, not a work queue. Check the evidence and exact
-correction. Apply only an authorized local correction to agreed normal behavior. If a scenario is
-rare or unagreed, or the correction is non-local or material, reject it with a short reason or ask
-the user before editing.
+After the reviewer returns, do not edit. Explain what you changed and how it works, then what the
+reviewer found, what it can cause, whether you agree and why, and what you recommend. Wait for the
+user's approval.
 ```
 
 Dedicated agent descriptions should state purpose, trigger, and exclusions concretely. Keep

@@ -90,8 +90,9 @@ has corrected the final summary.
 1. Apply [project-knowledge-structures.md](project-knowledge-structures.md). Preserve an existing
    suitable topology without asking for it again; when a new topology or explicit reorganization is
    needed, obtain the user's choice before writing it.
-2. Write durable project facts in English. Replace template placeholders and keep `CLAUDE.md` as a
-   compact entrypoint.
+2. Prepare durable project facts in English without writing them yet. Replace template placeholders
+   in the proposed content and keep `CLAUDE.md` as a compact entrypoint.
+   Present the exact Project Knowledge diff for approval; then write the approved documentation.
 3. If post-launch ideas were discussed, offer to add them to the existing backlog. When the project
    has no backlog convention, ask where to put them instead of inventing a second convention.
 4. Return to Documentation Review in the main skill, using `interview.yml`, its recorded decisions,

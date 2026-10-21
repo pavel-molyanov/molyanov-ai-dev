@@ -6,10 +6,10 @@
 
 ## How This Project Works
 
-**Context:** All project knowledge is in the `.claude/skills/project-knowledge/` skill, which routes
-agents to the project's compact, core, UX, and domain documentation as applicable.
+**Context:** Load the `project-knowledge` skill before changing, debugging, or explaining how this
+project works: its code, configuration, skills, agents, or pipelines.
 
-**Default branch:** `dev`
+**Default branch:** `[main | dev]`
 
 **Backlog:** `./backlog.md`
 

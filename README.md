@@ -2,6 +2,8 @@
 
 # AI-First Development Framework
 
+**Telegram:** [@molyanov_blog](https://t.me/molyanov_blog)
+
 A practical, intent-driven methodology for building software with
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and
 [Codex](https://github.com/openai/codex). It combines proportional planning, durable Project
@@ -22,7 +24,8 @@ Claude files are the editable source of truth. Codex files are generated runtime
 | `~/.claude/agents/*.md` | `~/.codex/agents/*.toml` |
 | `~/.claude/commands/*.md`, when present | `~/.codex/skills/source-command-*/**` |
 | Project `CLAUDE.md` | Project `AGENTS.md` |
-| Project `.claude/**` | Project `.codex/**` |
+| Project `.claude/skills/**` and `.claude/commands/*.md` | Project `.agents/skills/**` |
+| Project `.claude/agents/*.md` | Project `.codex/agents/*.toml` |
 
 After editing Claude-side sources, regenerate and review the Codex runtime:
 
@@ -31,8 +34,10 @@ After editing Claude-side sources, regenerate and review the Codex runtime:
 ~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply
 ```
 
-The conversion is manual and reports conflicts, validation failures, and managed orphans instead
-of silently deleting ambiguous runtime output.
+Run conversion after editing sources; project Git hooks also run it before commits and check
+for drift before pushes. The converter reports conflicts, validation failures, and managed orphans.
+On the next project sync it automatically moves its legacy `.codex/skills` into `.agents/skills`;
+unknown or manually edited files require conflict resolution.
 
 ## Quick start
 
@@ -46,16 +51,26 @@ cd molyanov-ai-dev
 For a new or empty setup, copy the runtime you use:
 
 ```bash
-mkdir -p ~/.claude/scripts ~/.codex
+mkdir -p ~/.claude/scripts ~/.codex/skills ~/.codex/agents ~/.agents
 cp -R skills agents ~/.claude/
-cp scripts/sync-*.py scripts/sync-*.sh ~/.claude/scripts/
-cp -R .codex/skills .codex/agents ~/.codex/
+cp scripts/*.py scripts/*.sh ~/.claude/scripts/
+cp -R .agents/skills/. ~/.codex/skills/
+cp -R .codex/agents/. ~/.codex/agents/
+if [ ! -e ~/.agents/skills ] && [ ! -L ~/.agents/skills ]; then
+  ln -s ../.codex/skills ~/.agents/skills
+fi
 ```
 
 If you already use Claude Code or Codex, do not overwrite your whole configuration. Compare this
 repository's `CLAUDE.md` and `AGENTS.md` with your files and manually add the instructions you are
 missing. Update framework skills and agents selectively, remove only obsolete framework packages,
-and keep your personal packages and Codex-owned `.codex/skills/.system` unchanged.
+and keep your personal packages and Codex-owned `~/.codex/skills/.system` unchanged.
+
+Global skills physically live in `~/.codex/skills`, and agents in `~/.codex/agents`. Codex
+discovers skills through the `~/.agents/skills` → `../.codex/skills` symlink; published agents
+reference files in `~/.codex/skills`. If `~/.agents/skills` already exists, verify that it is the
+correct symlink. Reconcile its contents first if it is a real directory; do not copy a second
+skill set there. Use `unlink ~/.agents/skills` when replacing the symlink.
 
 Then describe the outcome in plain language. Skills route by intent; slash-command wrappers are
 not required.
@@ -86,13 +101,15 @@ One request may activate several skills. A UI feature with state changes, for ex
 ### Planned feature lifecycle
 
 1. **Plan.** `user-spec-planning` runs an adaptive interview, reads relevant Project Knowledge,
-   researches the codebase, and writes `work/{feature}/user-spec.md` from bundled templates.
+   researches the codebase, clarifies errors and edge cases, and writes
+   `work/{feature}/user-spec.md` from bundled templates.
 2. **Validate.** Fresh quality, adequacy, and factual-codebase reviewers check the same draft.
    Findings must identify concrete evidence, a violated requirement, realistic conditions, and
    impact.
 3. **Approve.** The user explicitly approves the user spec before implementation begins.
 4. **Implement.** The required execution skills make the scoped change and run the smallest checks
-   that establish the result. Applicable reviewers inspect the completed revision.
+   that establish the result. Applicable reviewers inspect the completed revision. Findings are
+   presented to the user; fixes and another review require their approval.
 5. **Finalize.** `documentation-writing` updates only affected durable Project Knowledge and moves
    the feature folder to `work/completed/{feature}/`.
 
@@ -119,7 +136,7 @@ loads only the context needed for the current task. Standard projects may use re
 | Skill | Purpose |
 |---|---|
 | `methodology` | Explains routing, lifecycle, sources of truth, and review model |
-| `project-initialization` | Creates a dual-runtime project, preserves existing files, configures hooks, Git, and a private GitHub repository |
+| `project-initialization` | Creates a dual-runtime project with hooks and a private GitHub repository: `main` + `dev` for software, `main` only for a skills workspace; preserves existing files |
 | `documentation-writing` | Creates, audits, updates, and finalizes Project Knowledge |
 | `user-spec-planning` | Produces an approved user spec through adaptive interview, code research, and validation |
 
@@ -137,7 +154,7 @@ loads only the context needed for the current task. Standard projects may use re
 
 | Skill | Purpose |
 |---|---|
-| `test-master` | Selects the smallest reliable test boundary and reviews test quality |
+| `test-master` | Selects the smallest reliable test boundary for deterministic behavior and reviews test quality |
 | `code-reviewing` | Reviews code against scope, project contracts, and quality risks |
 | `layout-reviewing` | Reviews visual fidelity, responsiveness, and evidence coverage |
 | `security-auditor` | Reviews changed security boundaries against applicable OWASP risks |
@@ -178,7 +195,11 @@ removed.
   instructions into Codex runtime artifacts.
 - `scripts/sync-mcp-to-codex.py` / `.sh` preview and import MCP configuration separately from skill
   conversion.
-- `.codex/skills/` and `.codex/agents/` provide a ready-made sanitized Codex runtime snapshot.
+- `scripts/codex-sync-git-guard.py` synchronizes project sources before commits and checks runtime
+  drift before pushes.
+- `.agents/skills/` and `.codex/agents/` provide a ready-made sanitized Codex runtime snapshot.
+- Root `.githooks/` maintain this public snapshot from `skills/` and `agents/`;
+  `.githooks/sync-runtime.py --check` checks it without writing.
 - Codex-owned `.system` skills and host-local `.codex/.sync/` state are intentionally excluded.
 
 ## Requirements
@@ -193,3 +214,5 @@ removed.
 ## License and author
 
 [MIT](LICENSE) © [Pavel Molyanov](https://molyanov.ru)
+
+**Telegram:** [@molyanov_blog](https://t.me/molyanov_blog)

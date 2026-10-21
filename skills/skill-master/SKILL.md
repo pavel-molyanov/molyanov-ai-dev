@@ -1,33 +1,55 @@
 ---
 name: skill-master
 description: |
-  Guides skill creation and updates with specialized knowledge and workflows.
-
-  Use when: "создай скилл", "измени скилл", "гайд по скиллам", "обнови скилл", "улучши скилл",
-  "create skill", "update skill", "skill guide", "new skill", "how to write a skill"
+  Guides creating, editing, and reviewing skills in ~/.claude and project .claude/ for Claude
+  Code and Codex: local form and routing standards, references, scripts, skill reviewers, and
+  the required Claude-to-Codex sync after edits. Use whenever a skill is being changed or
+  evaluated, including proposing a change, diagnosing why a skill did not trigger, and fixing
+  its description or rules. Use instead of the generic skill-creator for these skills.
 ---
 
 # Skill Creator
 
 ## Manual Claude-to-Codex Sync
 
-Claude-side is the source of truth for the converter's allowlist: global `skills/**`, `agents/*.md`,
-and `commands/*.md`; or project `CLAUDE.md`, `.claude/skills/**`, `.claude/agents/*.md`, and
-`.claude/commands/*.md`.
-Codex-side outputs are generated runtime. No scheduled job performs this conversion. After editing
-an allowlisted source, the editing agent runs the matching command and reviews the generated result
-before finishing:
+Claude-side is the source of truth for the converter's allowlist: global `CLAUDE.md`, `skills/**`,
+`agents/*.md`, and `commands/*.md`; or project `CLAUDE.md`, `.claude/skills/**`,
+`.claude/agents/*.md`, and `.claude/commands/*.md`. Codex-side outputs are generated runtime. No
+scheduled job performs this conversion. After editing an allowlisted source, the editing agent runs
+the matching command immediately and reviews the generated result:
 
 ```bash
 ~/.claude/scripts/sync-to-codex.sh --apply                   # global ~/.claude/**
 ~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply  # project .claude/**
 ```
 
-For a project, commit generated `.codex/**` / `AGENTS.md` changes with their Claude sources, except host-local `.codex/.sync/**`. Global `~/.codex/**` is runtime state outside the `~/.claude` repository: run the global command explicitly on every affected host and do not add it to the Claude-source commit. If sync reports a conflict or validation error, stop and report it.
+Do not edit generated Codex files directly. If one was changed, move the intended content to its
+Claude source, discard the direct generated edit, and run the matching command above to regenerate
+Codex.
 
-**Authoring a skill that edits `.claude/**`?** Paste the block above near the top of its `SKILL.md` so its changes reach Codex too. A skill that never touches `.claude/**` (pure analysis, code-writing in a project's own source tree) does not need it.
+Git hooks are fallback checks: pre-commit repeats project sync, rejects partial staging, and stages
+generated outputs; pre-push blocks remaining drift. For a project, commit generated
+`.agents/skills/**`, `.codex/**`, and `AGENTS.md` changes with their Claude sources, except
+host-local `.codex/.sync/**`. For global changes, commit and push generated outputs in the
+separate `~/.codex` repository before pushing `~/.claude`; global pre-push enforces that ordering.
 
-**Bundled resources and the sync:** Markdown files (`SKILL.md`, `references/*.md`) are text-adapted during sync (Claude tool names → Codex equivalents). Every other bundled file — `scripts/`, `assets/`, images, data — is copied **byte-for-byte, unmodified**. So a bundled script must be **runtime-agnostic**: don't hardcode `.claude` paths or Claude-only tool names, since neither is rewritten in the Codex copy. Reference files relative to the script's own location, and let the surrounding `SKILL.md` prose (which *is* adapted) carry any runtime-specific instructions.
+If sync reports a conflict or validation error, stop and report it. When an approved deletion or
+rename produces an orphan, inspect every reported target and, only when all targets correspond to
+the approved source change, run the matching reviewed prune command:
+
+```bash
+~/.claude/scripts/sync-to-codex.sh --apply --prune --confirm-delete
+~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply --prune --confirm-delete
+```
+
+Stop instead if the orphan list contains anything else.
+
+**Bundled resources and the sync:** Markdown files (`SKILL.md`, `references/*.md`) are text-adapted
+during sync (Claude tool names to Codex equivalents). Every other bundled file—`scripts/`,
+`assets/`, images, and data—is copied byte-for-byte. Bundled executables must therefore remain
+runtime-neutral: do not hardcode `.claude` paths or Claude-only tool names, resolve resources
+relative to their own package, and keep runtime-specific instructions in Markdown that the
+converter adapts.
 
 ## About Skills
 
@@ -71,6 +93,12 @@ scope, and required output. If a material design decision remains unresolved, ru
 interview from [interview-guide.md](references/interview-guide.md) — question admission, stopping
 rule, and handling decisions the user cannot answer. Otherwise proceed without an interview.
 
+Before creating or materially changing a skill without an approved user-spec or user-approved
+plan, briefly explain in simple user-facing language how the skill will behave from activation to
+result, including any user checkpoints, and why this is the simplest sufficient design; then wait
+for approval. Show the user the exact text of every skill change, however small, and edit only
+after approval.
+
 ## 2. Skill Structure
 
 ### Anatomy of a Skill
@@ -96,38 +124,46 @@ skill-name/
 - kebab-case (lowercase, hyphens)
 - ≤64 characters
 - Exactly matches the skill directory name
-- Unique identifier
+- Unique identifier; must not contain "anthropic" or "claude"
 
 **`description`** (required):
 - Third person ("Analyzes code...", NOT "I analyze...")
 - Include both WHAT the skill does AND WHEN to use it
-- ≤1024 characters
+- ≤1024 characters, no XML tags
 
-#### Description Best Practices
+#### Writing the Description
 
-Claude uses description to decide when to auto-invoke the skill. Be specific and include key terms.
+The agent sees only descriptions before loading a skill, matches them by meaning, and consults a
+skill only when it believes it cannot handle the task well alone. Skills therefore tend to
+under-trigger, especially when the need is one step of a larger task or looks simple.
+
+- Put the key use case and terms first: Claude Code truncates long descriptions in the skill
+  listing, and Codex shortens descriptions first when all skills exceed its shared budget.
+- Describe WHEN as situations and topics, not as an inventory of user phrases; a few example
+  requests are fine when they clarify the domain.
+- Name what the agent lacks without the skill (data locations, conventions, a required
+  workflow) and cover non-obvious cases with "including…": the skill as one step of another
+  task, or a request that does not name the domain directly.
 
 **Template:**
 ```yaml
 description: |
-  [What the skill does — be specific, include key terms]
-
-  Use when: [trigger conditions — specific phrases users say]
+  [What the skill does and what it knows that the agent does not; key terms first.]
+  Use whenever [situations and topics], including [non-obvious cases].
 ```
-
-Use concrete positive routing: name the real intents and only the wording variations needed to
-distinguish the skill's domain.
 
 **Bad:**
 ```yaml
-description: This skill helps with documents. Use when user wants to work with docs.
+description: |
+  Helps with reports.
+
+  Use when: "сделай отчёт", "создай отчёт", "сгенерируй отчёт", "подготовь отчёт"
 ```
 **Good:**
 ```yaml
 description: |
-  Manage .claude/skills/project-knowledge/ docs: create, check, update.
-
-  Use when: "заполни документацию", "создай документацию", "проверь документацию", "обнови документацию"
+  Extracts text and tables from PDF files, fills forms, and merges documents. Use when working
+  with PDF files or when the user mentions PDFs, forms, or document extraction.
 ```
 #### Negative Triggers
 
@@ -135,13 +171,14 @@ Add an explicit "do not use for" line only when the skill genuinely overlaps a n
 
 ```yaml
 description: |
-  Analyze SQL query performance and suggest index changes.
-
-  Use when: "why is this query slow", "optimize this SELECT", "add an index"
+  Analyzes SQL query performance and suggests index changes. Use when a query is slow or may
+  need an index.
   Do NOT use for: writing new queries from scratch, schema design, data migrations.
 ```
 
-**Need argument-hint, disable-model-invocation, or model override?** Read [frontmatter-options.md](references/frontmatter-options.md) — optional fields and when to use each.
+**Need invocation control, tool permissions, path scoping, forked execution, or a model or
+effort override?** Read [frontmatter-options.md](references/frontmatter-options.md) — optional
+fields, their Claude Code effect, and why routing stays in `description`.
 
 ### Body
 
@@ -252,8 +289,15 @@ accept/reject behavior.
 
 ### Generalize and Explain Why
 
-Write a draft, then remove instructions that do not change the outcome. Generalize from realistic
-usage instead of adding branches for isolated examples or hypothetical future configurations.
+Treat an incident as evidence, not as a rule template. Remove its names, artifacts, and exact
+sequence; if no reusable decision remains across multiple realistic uses, fix the execution or
+local artifact instead of changing the skill. Keep incident-specific guidance only for an
+established contract or a security, authorization, data-loss, or irreversible-action boundary.
+
+Refer to the person the skill serves as "the user" and keep their personal facts (name, accounts,
+home-directory paths) in the project's documented context, such as Project Knowledge, not in skill
+text: skills are reused across projects and people, and a hardcoded owner makes them wrong or
+leaky elsewhere.
 
 Prefer positive instructions when they fully convey the rule. Keep explicit negatives for
 security, irreversible damage, disambiguation, and scope boundaries.
@@ -280,8 +324,8 @@ reviewer.
 
 ### Run Applicable Reviewers
 
-Launch fresh skeptical reviewers according to what changed. Each applies the evidence gate and
-common JSON contract from [agents.md → Reviewer contract](references/agents.md):
+Launch fresh skeptical reviewers according to what changed. Each applies the common contract from
+[agents.md → Reviewer contract](references/agents.md):
 
 - `skill-checker` — form, routing, package structure, and references;
 - `skill-logic-reviewer` — executable logic on required paths and established contracts;
@@ -292,12 +336,31 @@ changes, and `skill-simplicity-reviewer` when changing rules, phases, checkpoint
 or references. Run all three in parallel for a new skill or a major rewrite. Do not run an
 unaffected lane merely to satisfy ceremony.
 
-Provide the user scope, touched artifacts, relevant references and contracts, and validation
-evidence. Review findings are diagnoses, not a work queue. Check the evidence and exact correction;
-apply only an authorized local correction to agreed normal behavior. If the scenario is rare or
-unagreed, or the correction adds behavior, state, entities, contracts, dependencies, architecture,
-or material complexity, reject it with a short reason or ask the user before editing. A
-`user_decision_required: false` value does not replace this check. Follow
-[agents.md → Orchestrator responsibilities](references/agents.md).
+Provide the user scope, touched artifacts, relevant references and contracts, validation evidence,
+and a short explanation of what changed, how the skill will affect agent behavior, why this
+approach was chosen, deliberate limits, and assumptions. Reviewers may challenge the chosen
+approach or propose alternatives within their lane. After reviewers return, apply no finding and
+do not repeat the review automatically. Explain what changed in the skill and how it will affect
+agent behavior, then what reviewers found, what it can cause, whether you agree and why, and what
+you recommend. Wait for the user's approval before editing.
 
 All three are defined under `~/.claude/agents/` and have skill-master preloaded.
+
+### Check Triggering
+
+After applying a description change that affects routing, check it in fresh sessions; the
+authoring session already holds the skill in context and hides gaps. From the directory where
+each would normally be asked, run the request that exposed the miss, one or two realistic
+requests (including one where the skill is a step of a larger task), and one near-miss that
+belongs to a neighboring skill:
+
+```bash
+claude -p "<request>" --output-format stream-json --verbose --max-turns 4 \
+  --permission-mode plan --no-session-persistence \
+  | grep -oE '"skill":"[^"]*"|"terminal_reason":"[^"]*"'
+```
+
+Each run prints the skills it loaded and how it ended. A run that ended with an API or
+authentication error (`"terminal_reason":"api_error"`) did not test routing: stop and tell the
+user instead of counting it as a miss. Repeat the request that exposed the miss a few times.
+Routing is probabilistic: report the results to the user as evidence, not as a guarantee.

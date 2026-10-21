@@ -14,10 +14,30 @@ from pathlib import Path
 
 ZERO_OID = "0" * 40
 MANIFEST = Path(".sync/claude-to-codex-manifest.json")
+# Project skills are generated into .agents/skills; .codex/skills is the legacy location.
+PROJECT_SKILLS = ".agents/skills"
+LEGACY_PROJECT_SKILLS = ".codex/skills"
+# Git exports these to hooks, and a pathspec commit (`git commit -- path`) points
+# GIT_INDEX_FILE at a temporary index. Git commands for another repository must
+# not inherit them, or they read and write the hook repository's index.
+HOOK_REPO_ENV = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_PREFIX",
+    "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+)
+HOOK_REPO: Path | None = None
 
 
 class GuardError(RuntimeError):
     pass
+
+
+def foreign_env() -> dict[str, str]:
+    return {key: value for key, value in os.environ.items() if key not in HOOK_REPO_ENV}
 
 
 def run(
@@ -27,13 +47,17 @@ def run(
     check: bool = True,
     capture: bool = True,
     stdin: str | None = None,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    if env is None and HOOK_REPO is not None and not Path(cwd).resolve().is_relative_to(HOOK_REPO):
+        env = foreign_env()
     result = subprocess.run(
         args,
         cwd=cwd,
         text=True,
         input=stdin,
         capture_output=capture,
+        env=env,
     )
     if check and result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
@@ -71,7 +95,8 @@ def is_global_source(path: str) -> bool:
     if not parts:
         return False
     if parts[0] == "skills":
-        return len(parts) >= 2
+        # claude.ai rewrites skills/synced in the background; sync-to-codex skips it.
+        return len(parts) >= 2 and parts[1] != "synced"
     if parts[0] in {"agents", "commands"}:
         return len(parts) == 2 and path.endswith(".md")
     return False
@@ -98,6 +123,8 @@ def project_target_root(path: str) -> str | None:
     if parts[-1] == "AGENTS.md":
         return Path(*parts[:-1]).as_posix() if len(parts) > 1 else "."
     for index, part in enumerate(parts):
+        if part == ".agents" and parts[index + 1 : index + 2] == ("skills",) and index + 2 < len(parts):
+            return Path(*parts[:index]).as_posix() if index else "."
         if part != ".codex" or index + 1 >= len(parts):
             continue
         if parts[index + 1] == ".sync":
@@ -125,7 +152,7 @@ def is_global_target(path: str) -> bool:
 
 def source_pathspecs(root: str, *, global_scope: bool) -> list[str]:
     if global_scope:
-        return ["CLAUDE.md", "skills", "agents/*.md", "commands/*.md"]
+        return ["CLAUDE.md", "skills", ":(exclude)skills/synced", "agents/*.md", "commands/*.md"]
     prefix = "" if root == "." else f"{root}/"
     return [
         f"{prefix}CLAUDE.md",
@@ -205,8 +232,18 @@ def sync_failure_guidance(sync_script: Path, project: Path | None, detail: str) 
     return regeneration_guidance(sync_script, project)
 
 
-def invoke_sync(sync_script: Path, *, cwd: Path, project: Path | None, apply: bool) -> None:
-    result = run(sync_command(sync_script, project=project, apply=apply), cwd=cwd, check=False)
+def invoke_sync(
+    sync_script: Path,
+    *,
+    cwd: Path,
+    project: Path | None,
+    apply: bool,
+    foreign_targets: bool = False,
+) -> None:
+    # The converter runs git in the repository that holds its outputs; from the
+    # ~/.claude hook that is ~/.codex, so it must not see the hook's git variables.
+    env = foreign_env() if foreign_targets else None
+    result = run(sync_command(sync_script, project=project, apply=apply), cwd=cwd, check=False, env=env)
     if result.returncode != 0:
         detail = (result.stderr + result.stdout).strip()
         action = "sync" if apply else "drift check"
@@ -239,6 +276,22 @@ def status_for_targets(repo: Path, targets: set[Path]) -> list[str]:
         return []
     output = git(repo, "status", "--porcelain=v1", "-z", "--", *relative).stdout
     return [entry for entry in output.split("\0") if entry]
+
+
+def legacy_skills_path(root: str) -> str:
+    return LEGACY_PROJECT_SKILLS if root == "." else f"{root}/{LEGACY_PROJECT_SKILLS}"
+
+
+def stage_removed_legacy_skills(repo: Path, root: str) -> None:
+    """Stage deletions the converter made while moving skills out of .codex/skills.
+
+    The manifest of this host may not record every legacy file (another host or
+    branch generated it), so the deletions are taken from Git, not the manifest.
+    """
+    output = git(repo, "ls-files", "--deleted", "-z", "--", legacy_skills_path(root)).stdout
+    deleted = [path for path in output.split("\0") if path]
+    if deleted:
+        git(repo, "add", "-A", "--", *deleted)
 
 
 def project_roots(paths: list[str]) -> list[str]:
@@ -281,11 +334,11 @@ def mapped_targets(
             continue
         family, remainder = parts[0], Path(*parts[1:])
         if family == "skills":
-            targets.add(base / ("skills" if global_scope else ".codex/skills") / remainder)
+            targets.add(base / ("skills" if global_scope else PROJECT_SKILLS) / remainder)
         elif family == "agents" and remainder.suffix == ".md":
             targets.add(base / ("agents" if global_scope else ".codex/agents") / remainder.with_suffix(".toml"))
         elif family == "commands" and remainder.suffix == ".md":
-            command_root = base / ("skills" if global_scope else ".codex/skills")
+            command_root = base / ("skills" if global_scope else PROJECT_SKILLS)
             command_target = command_root / f"source-command-{remainder.stem}"
             source_staged = git(source_repo, "ls-files", "--stage", "--", path).stdout.splitlines()
             source_head = git(source_repo, "ls-tree", "HEAD", "--", path, check=False).stdout.splitlines()
@@ -383,6 +436,7 @@ def project_pre_commit(repo: Path, sync_script: Path) -> None:
         invoke_sync(sync_script, cwd=repo, project=project, apply=True)
         targets.update(load_manifest_targets(manifest))
         stage_targets(repo, targets)
+        stage_removed_legacy_skills(repo, root)
         invoke_sync(sync_script, cwd=repo, project=project, apply=False)
     print("Claude sources and generated Codex files are staged together.")
 
@@ -420,10 +474,10 @@ def global_pre_commit(repo: Path, sync_script: Path, codex_root: Path) -> None:
         global_scope=True,
     )
     targets.update(mapped_targets(codex_root, ".", relevant, global_scope=True, source_repo=repo))
-    invoke_sync(sync_script, cwd=repo, project=None, apply=True)
+    invoke_sync(sync_script, cwd=repo, project=None, apply=True, foreign_targets=True)
     targets.update(load_manifest_targets(manifest))
     stage_targets(codex_root, targets)
-    invoke_sync(sync_script, cwd=repo, project=None, apply=False)
+    invoke_sync(sync_script, cwd=repo, project=None, apply=False, foreign_targets=True)
     print(
         "Global Codex outputs are staged in ~/.codex. Commit and push that repository before pushing ~/.claude."
     )
@@ -502,12 +556,11 @@ def require_clean_sources(
 def project_pre_push(repo: Path, sync_script: Path, stdin_text: str) -> None:
     require_relevant_refs_at_head(repo, stdin_text, lambda path: project_managed_root(path) is not None)
     outgoing = outgoing_paths(repo, stdin_text)
-    managed_paths = [*outgoing, *worktree_paths(repo)]
     roots = [
         root
-        for root in project_roots(managed_paths)
+        for root in project_roots(outgoing)
         if project_has_managed_sources(repo if root == "." else (repo / root).resolve())
-        or any(project_source_root(path) == root for path in managed_paths)
+        or any(project_source_root(path) == root for path in outgoing)
     ]
     if not roots:
         return
@@ -524,6 +577,8 @@ def project_pre_push(repo: Path, sync_script: Path, stdin_text: str) -> None:
                 + "\nThen commit the regenerated Codex outputs before pushing."
             )
         targets.update(mapped_targets(repo, root, outgoing, global_scope=False, source_repo=repo))
+        # A half-committed move would leave both copies of a skill in the pushed tree.
+        targets.add(repo / legacy_skills_path(root))
         dirty = status_for_targets(repo, targets)
         if dirty:
             raise GuardError(
@@ -560,7 +615,7 @@ def global_pre_push(repo: Path, sync_script: Path, codex_root: Path, stdin_text:
     outgoing = outgoing_paths(repo, stdin_text)
     relevant = [path for path in outgoing if is_global_source(path)]
     require_clean_sources(repo, ["."], global_scope=True, sync_script=sync_script)
-    invoke_sync(sync_script, cwd=repo, project=None, apply=False)
+    invoke_sync(sync_script, cwd=repo, project=None, apply=False, foreign_targets=True)
     targets = load_manifest_targets(codex_root / MANIFEST)
     if not targets:
         raise GuardError(
@@ -597,9 +652,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    global HOOK_REPO
     args = parse_args(argv or sys.argv[1:])
     try:
         repo = repo_root(args.repo)
+        HOOK_REPO = repo
         sync_script = (args.sync_script or Path.home() / ".claude/scripts/sync-to-codex.sh").expanduser().resolve()
         codex_root = (args.codex_root or Path.home() / ".codex").expanduser().resolve()
         if not sync_script.is_file():

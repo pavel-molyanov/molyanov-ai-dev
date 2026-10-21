@@ -1,5 +1,13 @@
 # Architecture
 
+- [Purpose](#purpose)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Key Dependencies](#key-dependencies)
+- [External Integrations](#external-integrations)
+- [Data Flow](#data-flow)
+- [Data Model](#data-model)
+
 ## Purpose
 Technical architecture overview for AI agents. Helps agents understand HOW the system is built.
 

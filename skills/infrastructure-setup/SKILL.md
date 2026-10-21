@@ -1,35 +1,14 @@
 ---
 name: infrastructure-setup
 description: |
-  Provides project infrastructure conventions and review criteria for local setup, Docker,
-  Git hooks, CI/CD, service delivery, release artifacts, monitoring, backups, and operations.
-
-  Use when: "настрой инфраструктуру", "измени CI/CD", "подготовь деплой", "настрой Docker",
-  "собери release artifact", "настрой мониторинг", "проверь инфраструктуру", "оцени деплой",
-  "setup infrastructure", "review infrastructure"
-  Do NOT use for: choosing or writing application tests without an infrastructure change.
+  Infrastructure conventions and review criteria: local setup, Docker, Git hooks, CI/CD,
+  deployment, release artifacts, monitoring, backups, and recovery. Use whenever infrastructure is
+  set up, changed, deployed, or assessed, including preparing a deploy, publishing a build or
+  extension, and adding a health check or alert. Application tests without an infrastructure
+  change use test-master.
 ---
 
 # Infrastructure Conventions
-
-## Manual Claude-to-Codex Sync
-
-Claude-side is the source of truth for the converter's allowlist: global `skills/**`,
-`agents/*.md`, and `commands/*.md`; or project `CLAUDE.md`, `.claude/skills/**`,
-`.claude/agents/*.md`, and `.claude/commands/*.md`. Codex-side outputs are generated runtime. No scheduled job performs this
-conversion. After editing an allowlisted source, run the matching command and review the generated
-result before finishing:
-
-```bash
-~/.claude/scripts/sync-to-codex.sh --apply                   # global ~/.claude/**
-~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply  # project .claude/**
-```
-
-For a project, commit generated `.codex/**` and `AGENTS.md` changes with their Claude sources,
-except host-local `.codex/.sync/**`. Global `~/.codex/**` is runtime state outside the
-`~/.claude` repository: run the global command explicitly on every affected host and do not add
-it to the Claude-source commit. If sync reports a conflict or validation error, stop and report
-it.
 
 ## Scope and Judgment
 
@@ -102,19 +81,13 @@ incident behavior, notification routing, installation, and drills.
   publication, recovery, retention, monitoring, or shared-host boundaries. A trivial local or
   formatting-only change whose result is fully established by direct verification does not need a
   dedicated review. Supply the requested review boundary, relevant existing infrastructure,
-  Project Knowledge, applicable topic references, and available runtime evidence.
-- When a dedicated review is required, run no more than two review waves. Wave 1 reviews the
-  requested current-infrastructure or completed-change boundary. After an authorized correction
-  changes the reviewed result, re-verify the affected boundary, refresh durable Project Knowledge
-  facts, and run wave 2 with a fresh `infrastructure-reviewer`. Stop after a clean wave or when no
-  authorized correction changes the result. Include reviewers required by other active skills in
-  these same waves instead of starting a separate wave sequence.
-- Review findings are diagnoses, not a work queue. Check the evidence and exact correction. Apply
-  only an authorized local correction to agreed normal operation. If the scenario is rare or
-  unagreed, or the correction adds delivery, recovery, monitoring, isolation, persistent state,
-  infrastructure entities, dependencies, architecture, or material complexity, reject it with a
-  short reason or ask the user before editing. `user_decision_required: false` does not replace
-  this check. Report unsupported or unrelated findings without acting on them.
-- After wave 2, do not launch another reviewer automatically. If a remaining local correction is
-  made inside the agreed change, verify its affected boundary directly and refresh durable Project
-  Knowledge facts. Report any remaining risks or required user decisions.
+  Project Knowledge, applicable topic references, available runtime evidence, and, for completed
+  work, a short explanation of what changed, how the operational result works, why this approach
+  was chosen, deliberate limits, and assumptions. Include reviewers required by other active skills
+  in the same review stage.
+- After the reviewer returns, apply no finding and do not repeat the review automatically. Explain
+  what you changed and how the operational result works, then what the reviewer found, what it can
+  cause, whether you agree and why, and what you recommend. Surface critical production, security,
+  or data-loss risks even when you disagree, and wait for the user's approval before editing. After
+  an approved infrastructure change, verify the affected boundary directly and refresh durable
+  Project Knowledge facts.

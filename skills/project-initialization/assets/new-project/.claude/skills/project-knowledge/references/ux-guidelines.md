@@ -1,5 +1,14 @@
 # UX Guidelines
 
+- [Purpose](#purpose)
+- [Interface Language](#interface-language)
+- [Tone of Voice](#tone-of-voice)
+- [Domain Glossary](#domain-glossary)
+- [Text Patterns](#text-patterns)
+- [Copy Reference](#copy-reference)
+- [Design System](#design-system)
+- [Accessibility](#accessibility)
+
 <!--
 OPTIONAL FILE — DELETE if project has no significant UI (CLI tools, bots with minimal text, backend-only).
 For projects with minimal UI, add a brief "UX" section in patterns.md instead.

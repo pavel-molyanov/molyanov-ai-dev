@@ -1,11 +1,11 @@
 ---
 name: security-auditor
 description: |
-  Analyzes changed security boundaries against applicable OWASP risks and project contracts.
-  Use after code-reviewer when authentication, authorization, untrusted input, secrets, sensitive data, database queries, file paths, rendering, or external APIs changed.
-
-  Use when: "проверь безопасность", "security audit", "найди уязвимости", "check security"
-  Do NOT use for: general code review (use code-reviewer), test quality review (use test-reviewer)
+  Security audit criteria: applicable OWASP risks traced from untrusted input to sensitive sinks
+  (injection, XSS, CSRF, authentication and authorization, SSRF, path traversal, secrets, CI/CD
+  trust) and dependency vulnerability scans. Use whenever a change touches authentication,
+  authorization, untrusted input, secrets, sensitive data, queries, file paths, rendering, or
+  external requests, or a security audit is requested. General code review uses code-reviewing.
 ---
 
 # Security Auditor

@@ -1,9 +1,11 @@
 ---
 name: layout-writing
 description: |
-  Reproduces and adjusts web layouts from Figma, Claude Design exports, screenshots, or an existing project style with high visual fidelity and proportional verification.
-  Use when: "сверстай по Figma", "поправь вёрстку", "подвинь блок", "перенеси из Claude Design", "сделай адаптив", "добавь в том же стиле", "implement layout", "match Figma", "fix responsive layout".
-  Use alongside code-writing for mixed layout and business-logic tasks; use code-writing alone for logic-only work. Blank-slate visual design is outside this skill.
+  Reproduces and adjusts web layouts from Figma, Claude Design exports, screenshots, or the
+  project's existing style with high visual fidelity, using capture and overlay scripts and a
+  layout review. Use whenever markup, styles, responsive behavior, or asset placement change,
+  including moving a block, adding a section in the existing style, and fixing a breakpoint.
+  Mixed layout and business logic also uses code-writing.
 ---
 
 # Layout Writing
@@ -26,6 +28,11 @@ decisions from project evidence, and works at relevant widths in the existing co
 4. Ask only for blockers that project or source evidence cannot resolve: the relevant frame when
    a Figma link names only a file, substitution of a required missing font or asset, or expansion
    beyond the requested scope.
+
+Before editing a non-trivial layout whose intended appearance is not defined by an approved
+user-spec, an exact visual source, or a user-approved plan, briefly describe in simple user-facing
+language how the result will look and behave at relevant screen sizes and why it fits the existing
+project style, then wait for approval.
 
 Treat a new requirement, state, edge case, or improvement discovered during implementation or
 review as a proposal, not authorization. If it changes the agreed presentation, behavior, scope,
@@ -61,26 +68,19 @@ behavior; use both for mixed work.
 
 ## Review and Hand Off
 
-Run no more than two review waves. After every implementation, run wave 1 with one fresh
-`layout-reviewer` without a model override. Pass the request, scope, changed files, applicable
+After every implementation, run one review stage with one fresh `layout-reviewer` without a model
+override. Pass the request, scope, changed files, applicable
 repository instructions and project-pattern evidence, source mode and responsibility boundary,
 all checked widths, site images for every checked block and state, source and difference images
-where applicable, and the complete inventory and evidence set for a whole page or segmented tall
-block. Include reviewers required by other active skills in these same waves instead of starting a
-separate wave sequence.
+where applicable, the complete inventory and evidence set for a whole page or segmented tall block,
+and a short explanation of what changed, how the layout behaves, why this approach was chosen,
+deliberate limits, and assumptions. Include reviewers required by other active skills in the same
+stage rather than starting a separate review sequence.
 
-Review findings are diagnoses, not a work queue. Check the evidence and exact correction. Apply
-only an authorized local correction to agreed normal presentation. If the scenario is rare or
-unagreed, or the correction adds behavior, state, markup states, component contracts, architecture,
-or material complexity, reject it with a short reason or ask the user before editing.
-`user_decision_required: false` does not replace this check. After an authorized correction changes
-the reviewed result, recapture affected evidence and run wave 2 with a fresh `layout-reviewer`.
-Stop after a clean wave or when no authorized correction changes the result; do not start a wave
-only for a finding that awaits the user's decision.
+After reviewers return, do not change the layout from their findings or repeat the review
+automatically. Explain what you changed and how the layout behaves, then what reviewers found, what
+it can cause, whether you agree and why, and what you recommend. Wait for the user's approval;
+recapture and directly inspect affected widths and states after approved changes.
 
-After wave 2, do not launch another reviewer automatically. Correct remaining local mismatches
-inside the agreed presentation, recapture and inspect the affected widths and states, and report
-any remaining findings or required user decisions.
-
-Hand off with the change summary, checks run, widths and blocks actually verified, finding
-dispositions, and known evidence limitations.
+Hand off with the change summary, checks run, widths and blocks actually verified, reviewer
+findings and your assessment, and known evidence limitations.

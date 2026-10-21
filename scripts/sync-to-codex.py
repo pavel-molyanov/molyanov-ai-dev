@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import tomllib
@@ -21,6 +22,10 @@ from pathlib import Path
 VERSION = "1"
 MANIFEST_REL = Path(".sync/claude-to-codex-manifest.json")
 LOCK_REL = Path(".sync/claude-to-codex.lock")
+# Codex discovers project skills in .agents/skills; .codex/skills is the legacy location.
+PROJECT_SKILLS_REL = Path(".agents/skills")
+LEGACY_PROJECT_SKILLS_REL = Path(".codex/skills")
+LEGACY_CACHE_NAMES = {"__pycache__", ".DS_Store"}
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,80}$")
 
 PROTECTED_PARTS = {
@@ -52,7 +57,7 @@ PROTECTED_NAMES = {
 SECRET_LINE_RE = re.compile(
     r"(-----BEGIN .*PRIVATE KEY-----|(?<![A-Za-z0-9])gh[pousr]_[A-Za-z0-9_]+|(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{20,}|"
     r"\b[0-9]{8,10}:[A-Za-z0-9_-]{30,}\b|AKIA[0-9A-Z]{16}|"
-    r"(password|secret|token|api[_-]?key)\s*=\s*[A-Za-z0-9_./+=:-]{8,})",
+    r"(password|secret|token|api[_-]?key)\s*=\s*(?!process\.env\.)[A-Za-z0-9_./+=:-]{8,})",
     re.IGNORECASE,
 )
 SECRET_PLACEHOLDER_RE = re.compile(r"(EXAMPLE|PLACEHOLDER|REDACTED|DUMMY|FAKE)", re.IGNORECASE)
@@ -212,7 +217,7 @@ def is_skill_dir_rel(rel: Path) -> bool:
     nested-project and the parent project symlinks them (single source of truth).
     """
     return (len(rel.parts) == 2 and rel.parts[0] == "skills") or (
-        len(rel.parts) == 3 and rel.parts[:2] == (".codex", "skills")
+        len(rel.parts) == 3 and rel.parts[:2] in {(".codex", "skills"), (".agents", "skills")}
     )
 
 
@@ -315,6 +320,7 @@ def validate_project_target(path: Path, project_root: Path, symlink_leaf: bool =
     allowed = (
         rel == Path("AGENTS.md")
         or rel.parts[:1] == (".codex",)
+        or (rel.parts[:2] == PROJECT_SKILLS_REL.parts and len(rel.parts) > 2)
     )
     if not allowed:
         raise ProtectedPathError(f"project target outside allowlist: {path}")
@@ -374,6 +380,7 @@ def add_generated_header(content: str, prefix: str, suffix: str = "") -> str:
 
 def adapt_common_text(text: str) -> str:
     replacements = [
+        ("NEVER use AskUserQuestion tool.", "NEVER use request_user_input tool."),
         ("CLAUDE.md", "AGENTS.md"),
         (".claude", ".codex"),
         ("Claude Code", "Codex"),
@@ -386,6 +393,17 @@ def adapt_common_text(text: str) -> str:
     for old, new in replacements:
         text = text.replace(old, new)
     return text
+
+
+def adapt_project_instructions(text: str) -> str:
+    """Project AGENTS.md: repo-relative skill paths go to .agents/skills before the general .claude -> .codex rule.
+
+    Home-anchored global skill paths keep their ~/.codex/skills form, so no
+    generated text depends on the host's ~/.agents/skills link.
+    """
+    for home in ("~/", "$HOME/"):
+        text = text.replace(f"{home}.claude/skills", f"{home}.codex/skills")
+    return adapt_common_text(text.replace(".claude/skills", PROJECT_SKILLS_REL.as_posix()))
 
 
 def _replace_tool_terms(text: str) -> str:
@@ -504,7 +522,10 @@ def frontmatter_list(value: str | list[str] | None) -> list[str]:
     return [token.strip() for token in value.split(",") if token.strip()]
 
 
-TOML_AGENT_KEYS = ("name", "description", "developer_instructions", "sandbox_mode")
+TOML_AGENT_KEYS = (
+    "name", "description", "developer_instructions", "sandbox_mode",
+    "model", "model_reasoning_effort",
+)
 WRITE_TOOLS = {"write", "edit", "multiedit", "bash", "notebookedit"}
 
 
@@ -575,7 +596,22 @@ def sandbox_mode_for_tools(allowed_tools: list[str]) -> str:
     return "read-only"
 
 
-def build_agent_toml(source: Path, source_root: Path) -> str | None:
+def agent_skill_pointer(skill: str, project_root: Path | None) -> str:
+    """Where a generated agent finds a skill it depends on.
+
+    Global agents use the absolute home path, which resolves from any working
+    directory. Project agents use the project copy, except the global
+    vault-manager when the project has no local one.
+    """
+    if project_root is None:
+        return f"~/.codex/skills/{skill}/SKILL.md"
+    local_skill = project_root / ".claude" / "skills" / skill / "SKILL.md"
+    if local_skill.is_file() or skill != "vault-manager":
+        return f"{PROJECT_SKILLS_REL.as_posix()}/{skill}/SKILL.md"
+    return f"~/.codex/skills/{skill}/SKILL.md"
+
+
+def build_agent_toml(source: Path, source_root: Path, project_root: Path | None = None) -> str | None:
     """Generate a Codex agent .toml from a Claude agent .md, or None to skip.
 
     Skips like the official migrator: missing name/description or empty body.
@@ -595,7 +631,7 @@ def build_agent_toml(source: Path, source_root: Path) -> str | None:
     skills = frontmatter_list(meta.get("skills"))
     if skills:
         pointers = "\n".join(
-            f"- Before starting, load the methodology from `.codex/skills/{skill}/SKILL.md`."
+            f"- Before starting, load the methodology from `{agent_skill_pointer(skill, project_root)}`."
             for skill in skills
         )
         instructions = f"{instructions}\n\n## Required methodology\n\n{pointers}"
@@ -606,6 +642,15 @@ def build_agent_toml(source: Path, source_root: Path) -> str | None:
         "developer_instructions": instructions,
         "sandbox_mode": sandbox_mode_for_tools(frontmatter_list(meta.get("allowed-tools"))),
     }
+    for source_key, target_key in (
+        ("codex-model", "model"),
+        ("codex-reasoning-effort", "model_reasoning_effort"),
+    ):
+        value = meta.get(source_key)
+        if value is not None:
+            if not isinstance(value, str) or not value.strip():
+                raise SyncError(f"invalid {source_key} in {source}")
+            fields[target_key] = value.strip()
     content = serialize_agent_toml(fields)
     return add_generated_header(content, "#")
 
@@ -675,10 +720,13 @@ def make_skill_file_item(
             content=content,
         )
     data = read_binary_source(source, read_root)
-    mode = 0o755 if source.stat().st_mode & 0o111 else 0o644
+    source_executable = bool(source.stat().st_mode & 0o111)
+    mode = 0o755 if source_executable else 0o644
     action = classify_managed_write_bytes(target, data, manifest_targets)
-    if action == "skip unchanged" and target.stat().st_mode & 0o777 != mode:
-        action = "update"
+    if action == "skip unchanged":
+        target_executable = bool(target.stat().st_mode & 0o111)
+        if target_executable != source_executable:
+            action = "update"
     return PlanItem(
         action=action,
         source=source,
@@ -733,6 +781,23 @@ def mirror_skill_link(link: str) -> str:
     -> `../../nested-project/.codex/skills/task-manager`).
     """
     return "/".join(".codex" if part == ".claude" else part for part in link.split("/"))
+
+
+def mirror_project_skill_link(link: str) -> str:
+    """Mirror a project skill-dir symlink into .agents/skills.
+
+    The source shape is validated first, so the link ends `.claude/skills/<name>`
+    (e.g. `../../nested-project/.claude/skills/task-manager`
+    -> `../../nested-project/.agents/skills/task-manager`).
+    """
+    parts = link.split("/")
+    return "/".join([*parts[:-3], *PROJECT_SKILLS_REL.parts, parts[-1]])
+
+
+def mirror_project_command_link(link: str, slug: str) -> str:
+    """Mirror a project command symlink (`.claude/commands/<name>.md`) into an .agents/skills dir."""
+    parts = link.split("/")
+    return "/".join([*parts[:-3], *PROJECT_SKILLS_REL.parts, slug])
 
 
 def assert_mirror_source_shape(link: str, kind: str, *, leaf_is_dir: bool = False) -> None:
@@ -839,7 +904,7 @@ def make_agent_item(
             link_target=link,
             manifest_source=source,
         )
-    content = build_agent_toml(source, read_root)
+    content = build_agent_toml(source, read_root, config.project_root)
     if content is None:
         return None
     validate_any_target(target, config)
@@ -915,7 +980,10 @@ def make_command_item(
         target = skills_dir / slug
         raw_link = os.readlink(source)
         assert_mirror_source_shape(raw_link, "commands")
-        link = mirror_command_link(raw_link, slug)
+        if config.project_root is not None:
+            link = mirror_project_command_link(raw_link, slug)
+        else:
+            link = mirror_command_link(raw_link, slug)
         assert_mirror_link_contained(target, link, sync_root(config))
         validate_any_target(target, config, symlink_leaf=True)
         return PlanItem(
@@ -966,14 +1034,18 @@ def make_skill_symlink_item(
     """Mirror a symlinked skill directory (shared from nested-project) as a symlink.
 
     Keeps the single-source-of-truth layout in Codex too: the parent project
-    points at nested-project's `.codex/skills/<name>` rather than duplicating files.
+    points at nested-project's Codex copy (`.agents/skills/<name>` in project mode)
+    rather than duplicating files.
     """
     name = source.name
     validate_slug(name)
     target = skills_dir / name
     raw_link = os.readlink(source)
     assert_mirror_source_shape(raw_link, "skills", leaf_is_dir=True)
-    link = mirror_skill_link(raw_link)
+    if config.project_root is not None:
+        link = mirror_project_skill_link(raw_link)
+    else:
+        link = mirror_skill_link(raw_link)
     assert_mirror_link_contained(target, link, sync_root(config))
     validate_any_target(target, config, symlink_leaf=True)
     return PlanItem(
@@ -1000,6 +1072,9 @@ def build_skill_items(
     items: list[PlanItem] = []
     skill_names: set[str] = set()
     for skill_dir in sorted(path for path in source_root.iterdir() if path.is_dir() or path.is_symlink()):
+        # claude.ai account-synced skills are not the maintainer's, and Codex ships its own built-ins.
+        if skill_dir.name == "synced":
+            continue
         validate_slug(skill_dir.name)
         # A skill dir that is itself a symlink (shared from a nested project) is
         # mirrored as a symlink, never walked/copied file-by-file. A link whose
@@ -1015,6 +1090,13 @@ def build_skill_items(
         if skill_md.exists():
             content = read_text_source(skill_md, config.claude_root)
             meta, _ = strip_frontmatter(content)
+            # `claude-only: true` marks a skill Codex does not need (it has the capability
+            # natively). Reject other spellings: a typo would silently sync it into Codex.
+            claude_only = meta.get("claude-only")
+            if claude_only not in (None, "true", "false"):
+                raise SyncError(f"claude-only must be true or false: {skill_md}")
+            if claude_only == "true":
+                continue
             if meta.get("name"):
                 if meta["name"] in skill_names:
                     raise SyncError(f"duplicate skill name: {meta['name']}")
@@ -1133,6 +1215,139 @@ def build_stale_items(
     return items
 
 
+def build_global_instruction_items(
+    config: SyncConfig,
+    manifest_targets: dict[str, str],
+) -> list[PlanItem]:
+    source = config.claude_root / "CLAUDE.md"
+    if not source.exists():
+        return []
+    content = adapt_common_text(read_text_source(source, config.claude_root))
+    target = config.codex_root / "AGENTS.md"
+    validate_target(target, config.codex_root)
+    return [
+        PlanItem(
+            action=classify_managed_write(target, content, manifest_targets),
+            source=source,
+            target=target,
+            adapter="global-instructions",
+            content=content,
+        )
+    ]
+
+
+def legacy_skill_entries(path: Path) -> list[Path]:
+    """Files and symlinks under a legacy skill dir; links are listed, never followed."""
+    entries: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(path, followlinks=False):
+        base = Path(dirpath)
+        entries.extend(base / name for name in dirnames if (base / name).is_symlink())
+        entries.extend(base / name for name in filenames)
+    return sorted(entries)
+
+
+def legacy_file_is_owned(path: Path, new_item: PlanItem | None, manifest_targets: dict[str, str]) -> bool:
+    """Whether a legacy file is this sync's output.
+
+    Any legacy file: identical to this host's manifest record. A file this run
+    regenerates at the new location: also identical to the new generation, or
+    identical to its committed copy (the Git guard keeps direct generated edits
+    out of commits; this covers a host or branch whose manifest does not record
+    the file). A file the sync no longer produces: also the generated marker, as
+    for orphans. A hand edit keeps the marker, so the marker never vouches for a
+    regenerated file, and Git never vouches for a file the sync does not produce.
+    """
+    if path.is_symlink():
+        return False
+    data = path.read_bytes()
+    recorded = manifest_targets.get(str(path.resolve()))
+    if recorded is not None and sha256_bytes(data) == recorded:
+        return True
+    if new_item is None or new_item.link_target is not None:
+        return has_generation_marker(path)
+    expected = new_item.raw_bytes if new_item.raw_bytes is not None else (new_item.content or "").encode("utf-8")
+    return data == expected or is_clean_tracked_file(path)
+
+
+def legacy_link_is_owned(path: Path, new_item: PlanItem | None, manifest_links: dict[str, str]) -> bool:
+    """Whether a legacy skill symlink matches this host's record or the old-layout mirror of its source."""
+    current = os.readlink(path)
+    if manifest_links.get(str(path)) == current:
+        return True
+    if new_item is None or new_item.link_target is None or new_item.source is None:
+        return False
+    raw_link = os.readlink(new_item.source)
+    if new_item.adapter == "project-command":
+        return current == mirror_command_link(raw_link, path.name)
+    return current == mirror_skill_link(raw_link)
+
+
+def legacy_skill_item(path: Path, owned: bool, config: SyncConfig) -> PlanItem:
+    if not owned:
+        return PlanItem(
+            action="conflict legacy copy not generated by sync",
+            source=None,
+            target=path,
+            adapter="legacy-skill",
+            reason="move or remove this file, then rerun the sync",
+        )
+    assert config.project_root is not None
+    validate_project_target(path, config.project_root, symlink_leaf=path.is_symlink())
+    return PlanItem(action="delete", source=None, target=path, adapter="legacy-skill", reason="moved to .agents/skills")
+
+
+def build_legacy_skill_items(
+    config: SyncConfig,
+    items: list[PlanItem],
+    manifest_targets: dict[str, str],
+    manifest_links: dict[str, str],
+) -> list[PlanItem]:
+    """Remove the legacy .codex/skills copy of every skill this run writes to .agents/skills.
+
+    Two real copies of one skill make Codex list it twice and break `$name`
+    invocation, so the old copy goes in the same run. It is removed only when
+    every entry is this sync's own output or regenerable cache; anything else is
+    a conflict, so apply refuses before writing anything.
+    """
+    assert config.project_root is not None
+    new_root = config.project_root / PROJECT_SKILLS_REL
+    old_root = config.project_root / LEGACY_PROJECT_SKILLS_REL
+    if not old_root.is_dir() or old_root.is_symlink():
+        return []
+    planned: dict[Path, PlanItem] = {}
+    for item in items:
+        try:
+            planned[item.target.relative_to(new_root)] = item
+        except ValueError:
+            continue
+    legacy: list[PlanItem] = []
+    for name in sorted({rel.parts[0] for rel in planned}):
+        old = old_root / name
+        if old.is_symlink():
+            legacy.append(legacy_skill_item(old, legacy_link_is_owned(old, planned.get(Path(name)), manifest_links), config))
+        elif old.is_dir():
+            for path in legacy_skill_entries(old):
+                inner = path.relative_to(old)
+                owned = bool(set(inner.parts) & LEGACY_CACHE_NAMES) or legacy_file_is_owned(
+                    path, planned.get(Path(name) / inner), manifest_targets
+                )
+                legacy.append(legacy_skill_item(path, owned, config))
+        elif old.exists():
+            legacy.append(legacy_skill_item(old, legacy_file_is_owned(old, planned.get(Path(name)), manifest_targets), config))
+    return legacy
+
+
+def remove_empty_dirs(root: Path) -> None:
+    """Remove empty directories under root and root itself; rmdir never removes content."""
+    if root.is_symlink() or not root.is_dir():
+        return
+    for dirpath, _dirnames, _filenames in os.walk(root, topdown=False):
+        try:
+            Path(dirpath).rmdir()
+        except OSError:
+            pass
+
+
 def build_project_items(
     config: SyncConfig,
     manifest_targets: dict[str, str],
@@ -1146,7 +1361,7 @@ def build_project_items(
     items: list[PlanItem] = []
     claude_md = project / "CLAUDE.md"
     if claude_md.exists():
-        content = adapt_common_text(read_text_source(claude_md, project))
+        content = adapt_project_instructions(read_text_source(claude_md, project))
         target = project / "AGENTS.md"
         validate_project_target(target, project)
         items.append(
@@ -1159,8 +1374,8 @@ def build_project_items(
             )
         )
     skills_root = project / ".claude" / "skills"
+    codex_skills_dir = project / PROJECT_SKILLS_REL
     if skills_root.exists():
-        codex_skills_dir = project / ".codex" / "skills"
         for child in sorted(skills_root.iterdir()):
             # A skill dir that is itself a symlink (shared from nested-project) is
             # mirrored as a symlink, never walked/copied file-by-file.
@@ -1201,10 +1416,12 @@ def build_project_items(
     if commands_dir.is_dir():
         for source in sorted(commands_dir.glob("*.md")):
             item = make_command_item(
-                source, project, project / ".codex" / "skills", "project-command", config, manifest_targets, manifest_links
+                source, project, codex_skills_dir, "project-command", config, manifest_targets, manifest_links
             )
             if item is not None:
                 items.append(item)
+    # After every write item, so apply writes the new copy before removing the old one.
+    items.extend(build_legacy_skill_items(config, items, manifest_targets, manifest_links))
     items.extend(
         build_stale_items(project / ".codex", prune, "Claude-shaped Codex wrapper leftover", manifest_targets, manifest_links)
     )
@@ -1236,16 +1453,69 @@ def manifest_target_links(config: SyncConfig) -> dict[str, str]:
     return links
 
 
+def is_clean_tracked_file(target: Path) -> bool:
+    """Whether Git confirms that a stale local manifest is the only mismatch."""
+    repository = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=target.parent,
+        text=True,
+        capture_output=True,
+    )
+    if repository.returncode != 0:
+        return False
+    root = Path(repository.stdout.strip())
+    try:
+        relative = target.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return False
+    tracked = subprocess.run(
+        ["git", "ls-files", "--error-unmatch", "--", relative],
+        cwd=root,
+        capture_output=True,
+    )
+    clean = subprocess.run(
+        ["git", "diff", "--quiet", "HEAD", "--", relative],
+        cwd=root,
+        capture_output=True,
+    )
+    return tracked.returncode == 0 and clean.returncode == 0
+
+
+def project_skill_entry(target: Path) -> Path | None:
+    """The `.agents/skills/<name>` entry that holds a project skill target, if any."""
+    parts = target.parts
+    width = len(PROJECT_SKILLS_REL.parts)
+    for index in range(len(parts) - width):
+        if parts[index : index + width] == PROJECT_SKILLS_REL.parts:
+            return Path(*parts[: index + width + 1])
+    return None
+
+
+def classify_existing_target(target: Path, current_sha256: str, manifest_targets: dict[str, str]) -> str:
+    previous_hash = manifest_targets.get(str(target.resolve()))
+    if previous_hash and current_sha256 != previous_hash and not is_clean_tracked_file(target):
+        return "conflict target edited"
+    # Other tools also install skills into .agents/skills: an unrecorded differing
+    # file there is foreign unless its skill carries the generated marker (written
+    # by this sync, possibly on another host) or Git confirms a committed copy.
+    entry = project_skill_entry(target)
+    if (
+        not previous_hash
+        and entry is not None
+        and not has_generation_marker(entry)
+        and not is_clean_tracked_file(target)
+    ):
+        return "conflict target edited"
+    return "update"
+
+
 def classify_managed_write(target: Path, content: str, manifest_targets: dict[str, str]) -> str:
     if not target.exists():
         return "create"
     current = target.read_text(encoding="utf-8")
     if current == content:
         return "skip unchanged"
-    previous_hash = manifest_targets.get(str(target.resolve()))
-    if previous_hash and sha256_text(current) != previous_hash:
-        return "conflict target edited"
-    return "update"
+    return classify_existing_target(target, sha256_text(current), manifest_targets)
 
 
 def classify_managed_write_bytes(target: Path, data: bytes, manifest_targets: dict[str, str]) -> str:
@@ -1254,10 +1524,7 @@ def classify_managed_write_bytes(target: Path, data: bytes, manifest_targets: di
     current = target.read_bytes()
     if current == data:
         return "skip unchanged"
-    previous_hash = manifest_targets.get(str(target.resolve()))
-    if previous_hash and sha256_bytes(current) != previous_hash:
-        return "conflict target edited"
-    return "update"
+    return classify_existing_target(target, sha256_bytes(current), manifest_targets)
 
 
 def planned_output_key(item: PlanItem) -> str:
@@ -1359,6 +1626,29 @@ def dangling_link_warnings(items: list[PlanItem]) -> list[str]:
     return warnings
 
 
+def global_skills_link_warning(config: SyncConfig) -> str | None:
+    """Codex documents ~/.agents/skills for user skills; on each host it must lead to ~/.codex/skills."""
+    if config.codex_root != (Path.home() / ".codex").resolve():
+        return None
+    link = Path.home() / ".agents" / "skills"
+    target = config.codex_root / "skills"
+    if link.resolve() == target.resolve():
+        return None
+    problem = f"{link} does not lead to {target}; Codex finds global skills only through its legacy path"
+    create = "mkdir -p ~/.agents && ln -s ../.codex/skills ~/.agents/skills"
+    if not os.path.lexists(link):
+        return f"{problem}. Create the link: {create}"
+    # rm -r with a trailing slash would follow a link into the global skills, so name the safe commands.
+    if link.is_symlink():
+        return f"{problem}; it is a link to {os.readlink(link)}. Run unlink ~/.agents/skills, then: {create}"
+    if link.is_dir():
+        return (
+            f"{problem}; it is a real directory. Move any skills you need into ~/.codex/skills, "
+            f"run rmdir ~/.agents/skills, then: {create}"
+        )
+    return f"{problem}; it is a file. Move it away, then: {create}"
+
+
 def build_plan(config: SyncConfig, prune: bool) -> SyncPlan:
     manifest_targets = manifest_target_hashes(config)
     manifest_links = manifest_target_links(config)
@@ -1366,7 +1656,11 @@ def build_plan(config: SyncConfig, prune: bool) -> SyncPlan:
     if config.project_root is not None:
         items = build_project_items(config, manifest_targets, manifest_links, prune)
     else:
-        items = build_skill_items(config, manifest_targets, manifest_links, warnings)
+        link_warning = global_skills_link_warning(config)
+        if link_warning:
+            warnings.append(link_warning)
+        items = build_global_instruction_items(config, manifest_targets)
+        items.extend(build_skill_items(config, manifest_targets, manifest_links, warnings))
         items.extend(build_agent_items(config, manifest_targets, manifest_links))
         items.extend(build_command_items(config, manifest_targets, manifest_links))
         items.extend(
@@ -1374,9 +1668,9 @@ def build_plan(config: SyncConfig, prune: bool) -> SyncPlan:
         )
     items.extend(build_orphan_items(config, items, prune, warnings))
     for item in items:
-        if item.adapter == "orphan":
-            # Already validated at collection; invalid targets were downgraded
-            # to warnings there instead of failing the whole plan.
+        if item.adapter in {"orphan", "legacy-skill"}:
+            # Already validated at collection (orphans: invalid targets were
+            # downgraded to warnings there instead of failing the whole plan).
             continue
         validate_any_target(
             item.target,
@@ -1642,6 +1936,8 @@ def apply_plan(config: SyncConfig, plan: SyncPlan) -> None:
             if item.target.is_symlink() or item.target.exists():
                 remove_target(item.target)
                 cleanup_empty_dirs(item.target.parent, stop)
+    if config.project_root is not None:
+        remove_empty_dirs(config.project_root / LEGACY_PROJECT_SKILLS_REL)
     write_manifest(config, plan)
 
 

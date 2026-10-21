@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec python3 "$HOME/.claude/scripts/codex-sync-git-guard.py" \
+  pre-push \
+  --scope project \
+  --repo "$(git rev-parse --show-toplevel)"

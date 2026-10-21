@@ -1,12 +1,14 @@
 <!--
-Scaffold for the project README. README is for humans — write the final content
+Scaffold for the project README. README is the project's description on GitHub: what the
+project is and why it exists, for people opening the repository. It holds no instructions,
+workflows or rules for agents — those live in CLAUDE.md and the skills. Write the final content
 in the language the user writes in. Headers below are a starting point; localize them too.
 -->
 
 # [Project name]
 
-> **This README is for the project owner**, not for AI agents.
-> Instructions for agents live in CLAUDE.md and the .claude/skills/project-knowledge/ skill.
+> **This README describes the project on GitHub.** Instructions for AI agents live in CLAUDE.md
+> and the .claude/skills/ skills.
 
 ## About
 

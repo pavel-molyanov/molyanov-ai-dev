@@ -22,25 +22,26 @@ type: feature
 ## Why
 [The problem being solved and the value created]
 
-## Expected Behavior
-[Describe the user flow in free form:
-1. The user does X.
-2. The system responds with Y.
-3. The user gets Z.]
+## What Changes
+[Only for changes to an existing process. Describe each affected process once: how it works now
+and how it should work after this change. Keep this at the process level; detailed target behavior
+belongs in "How It Should Work". Remove this section for a net-new feature.]
 
-## Acceptance Criteria
-- [ ] [Criterion 1 — observable result]
-- [ ] [Criterion 2]
-- [ ] [Criterion 3]
+## How It Should Work
+[Describe the target business behavior in plain language. Organize it by meaningful user actions
+or system events when there is more than one scenario. Include only applicable checks, branches,
+state changes, results, and important failure or stop behavior. A simple change may need only a
+short paragraph; do not force every scenario into a fixed schema.]
 
-## Constraints
-[Technical and business constraints: compatibility, security, scalability]
+## Scope and Constraints
+[State what is in scope, what is out of scope, and the technical or business constraints that
+materially shape the solution. Use short subsections or bullets only when they improve clarity.]
 
 ## Risks
 - **Risk 1:** [what could go wrong]. **Mitigation:** [action].
 - **Risk 2:** [description]. **Mitigation:** [action].
 
-[If no risks were identified, write "No risks identified."]
+[Remove this section when there are no substantive risks to record.]
 
 ## Accepted Decisions
 - Chose [X] because [Y].
@@ -48,24 +49,14 @@ type: feature
 
 [Record interview decisions in plain language. Include rejected alternatives only when they help explain a decision.]
 
-## Testing
+[Remove this section when no substantive decision needs to be preserved.]
 
-**Unit tests:** [what is covered / "not needed — no new logic is added"] — [reason].
+## Acceptance and Verification
 
-**Integration tests:** [needed / not needed] — [reason].
+| Result | How to verify |
+|--------|---------------|
+| [Observable result that must hold] | [Concrete automated, agent, or user check at the smallest reliable boundary] |
 
-**E2E tests:** [needed / not needed] — [reason].
-
-## Verification
-
-### Agent Verification
-
-| Step | Expected Result |
-|------|-----------------|
-| [1. Action description] | [What should happen] |
-| [2. Action description] | [Expected result] |
-
-### User Verification
-- [What to verify — how to verify — why manual verification is needed]
-
-[If the agent verifies everything, remove the "User Verification" subsection.]
+[Add or remove rows to match the meaningful results. Cover the behavior that establishes
+completion without repeating every implementation detail, including an important negative outcome
+when applicable. Include user verification only when the agent cannot perform the check itself.]

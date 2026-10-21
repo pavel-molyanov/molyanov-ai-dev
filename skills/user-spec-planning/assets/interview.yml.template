@@ -10,7 +10,7 @@ interview_metadata:
 conversation_history: []
 # Entry format:
 # - asked_at: "YYYY-MM-DD HH:MM:SS"
-#   topic_keys: ["user_problem", "success_criteria"]
+#   topic_keys: ["user_problem", "scope_boundaries"]
 #   agent_questions: |
 #     Full question batch, verbatim.
 #   user_answer: |
@@ -47,35 +47,23 @@ general_understanding:
     gaps: ["Identify affected users when applicable"]
     required: false
 
-  success_criteria:
-    score: 0
-    value: ""
-    gaps: ["Define concrete observable success"]
-    required: true
-
   constraints:
     score: 0
     value: ""
     gaps: ["Identify applicable technical or business constraints"]
     required: true
 
-  testing_strategy:
+  scope_boundaries:
     score: 0
     value: ""
-    gaps: ["Map behavioral risks to the smallest reliable checks"]
+    gaps: ["State what is in scope and explicitly out of scope"]
     required: true
 
 user_experience:
   user_stories:
     score: 0
     value: ""
-    gaps: ["Describe applicable user flows step by step"]
-    required: true
-
-  acceptance_criteria:
-    score: 0
-    value: ""
-    gaps: ["Define testable acceptance criteria"]
+    gaps: ["Describe the target business logic through applicable user actions and system events"]
     required: true
 
   edge_cases:
@@ -93,7 +81,7 @@ user_experience:
   verification_strategy:
     score: 0
     value: ""
-    gaps: ["Define how the agent and user will verify the result"]
+    gaps: ["Identify observable evidence that would prove the important behavior works"]
     required: true
 
   ui_ux_requirements:

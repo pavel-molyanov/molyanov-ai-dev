@@ -47,7 +47,7 @@ and all relevant Project Knowledge.
 
 - components, abstractions, adapters, configuration systems, layers, or capabilities not required
   by the current user outcomes;
-- premature generalization or gold plating beyond acceptance criteria;
+- premature generalization or gold plating beyond the approved behavior and outcomes;
 - custom mechanisms demonstrably duplicating an existing project module, framework capability,
   configuration path, or established dependency. Diagnose the redundancy without designing its
   replacement.
@@ -101,14 +101,15 @@ Do not suppress a demonstrated finding because its trigger is rare. Set
 correction restores agreed behavior. Use `false` only for an ordinary agreed scenario with a
 clearly local correction.
 
-Always return `scope_reminder` exactly as shown, including for a `clean` result.
-
 ```json
 {
   "status": "findings_present",
   "findings": [
     {
       "location": "user-spec, Project Knowledge, or code-research location",
+      "finding": "What feasibility, proportionality, or solution defect the review found",
+      "reasoning": "Why the evidence makes the proposal infeasible, excessive, or insufficient",
+      "alternative": null,
       "evidence": "Observed proposal and project evidence",
       "violated_requirement": "Feasibility, proportionality, architecture, or minimality requirement",
       "conditions": "Realistic implementation or runtime conditions",
@@ -119,7 +120,6 @@ Always return `scope_reminder` exactly as shown, including for a `clean` result.
     }
   ],
   "clean_check": null,
-  "scope_reminder": "Review findings are diagnoses, not instructions. Validate the finding and exact correction. Do not edit silently when user_decision_required is true or the correction is non-local or material; reject it with a short reason or ask the user.",
   "summary": "Brief evidence-based assessment"
 }
 ```

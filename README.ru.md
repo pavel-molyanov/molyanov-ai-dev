@@ -2,6 +2,8 @@
 
 # AI-First Development Framework
 
+**Telegram:** [@molyanov_blog](https://t.me/molyanov_blog)
+
 Практическая intent-driven методология разработки с
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) и
 [Codex](https://github.com/openai/codex). Она объединяет пропорциональное планирование, долговечную
@@ -22,7 +24,8 @@ Project Knowledge, сфокусированные execution skills и доказ
 | `~/.claude/agents/*.md` | `~/.codex/agents/*.toml` |
 | `~/.claude/commands/*.md`, если есть | `~/.codex/skills/source-command-*/**` |
 | Проектный `CLAUDE.md` | Проектный `AGENTS.md` |
-| Проектная `.claude/**` | Проектная `.codex/**` |
+| Проектные `.claude/skills/**` и `.claude/commands/*.md` | Проектная `.agents/skills/**` |
+| Проектные `.claude/agents/*.md` | Проектные `.codex/agents/*.toml` |
 
 После изменения Claude-side источников перегенерируйте и проверьте Codex-рантайм:
 
@@ -31,8 +34,11 @@ Project Knowledge, сфокусированные execution skills и доказ
 ~/.claude/scripts/sync-to-codex.sh --project "$PWD" --apply
 ```
 
-Конвертация запускается вручную и сообщает о конфликтах, ошибках валидации и оставшихся managed
-orphans вместо неоднозначного автоматического удаления runtime-файлов.
+После редактирования запускайте конвертацию вручную; проектные Git hooks также запускают её перед
+коммитом и проверяют результат перед push. Конвертер сообщает о конфликтах, ошибках валидации и
+оставшихся managed orphans. При следующей синхронизации проекта он автоматически переносит свои
+старые `.codex/skills` в `.agents/skills`; неизвестные или изменённые вручную файлы требуют
+разрешения конфликта.
 
 ## Быстрый старт
 
@@ -46,16 +52,26 @@ cd molyanov-ai-dev
 Для новой или пустой установки скопируйте нужный рантайм:
 
 ```bash
-mkdir -p ~/.claude/scripts ~/.codex
+mkdir -p ~/.claude/scripts ~/.codex/skills ~/.codex/agents ~/.agents
 cp -R skills agents ~/.claude/
-cp scripts/sync-*.py scripts/sync-*.sh ~/.claude/scripts/
-cp -R .codex/skills .codex/agents ~/.codex/
+cp scripts/*.py scripts/*.sh ~/.claude/scripts/
+cp -R .agents/skills/. ~/.codex/skills/
+cp -R .codex/agents/. ~/.codex/agents/
+if [ ! -e ~/.agents/skills ] && [ ! -L ~/.agents/skills ]; then
+  ln -s ../.codex/skills ~/.agents/skills
+fi
 ```
 
 Если вы уже используете Claude Code или Codex, не перезаписывайте конфигурацию целиком. Сравните
 `CLAUDE.md` и `AGENTS.md` из репозитория со своими файлами и вручную добавьте недостающие инструкции.
 Обновляйте framework skills и agents выборочно, удаляйте только устаревшие пакеты фреймворка и не
-трогайте личные пакеты и принадлежащую Codex папку `.codex/skills/.system`.
+трогайте личные пакеты и принадлежащую Codex папку `~/.codex/skills/.system`.
+
+Глобальные навыки физически находятся в `~/.codex/skills`, агенты — в `~/.codex/agents`.
+Codex обнаруживает навыки через ссылку `~/.agents/skills` → `../.codex/skills`; опубликованные
+агенты ссылаются на файлы в `~/.codex/skills`. Если `~/.agents/skills` уже существует, убедитесь,
+что это нужная ссылка. Сначала разберите содержимое, если это обычная папка; не копируйте туда
+второй комплект. Для замены ссылки используйте `unlink ~/.agents/skills`.
 
 После этого опишите нужный результат обычным языком. Skills маршрутизируются по намерению;
 slash-command wrappers не требуются.
@@ -86,13 +102,14 @@ slash-command wrappers не требуются.
 ### Жизненный цикл запланированной фичи
 
 1. **Планирование.** `user-spec-planning` проводит адаптивное интервью, читает нужную Project
-   Knowledge, исследует код и создаёт `work/{feature}/user-spec.md` из bundled templates.
+   Knowledge, исследует код, проясняет ошибки и граничные случаи и создаёт `work/{feature}/user-spec.md` из bundled templates.
 2. **Валидация.** Независимые reviewers проверяют качество, адекватность и фактические утверждения
    о кодовой базе. Каждое замечание должно содержать конкретное доказательство, нарушенное
    требование, реалистичные условия и последствия.
 3. **Утверждение.** Пользователь явно утверждает user spec до начала реализации.
 4. **Реализация.** Нужные execution skills выполняют согласованное изменение и запускают минимальные
    проверки, которые доказывают результат. Применимые reviewers проверяют готовую ревизию.
+   Замечания показываются пользователю; исправления и повторное ревью требуют его согласия.
 5. **Финализация.** `documentation-writing` обновляет только затронутую долговечную Project
    Knowledge и переносит папку фичи в `work/completed/{feature}/`.
 
@@ -119,7 +136,7 @@ slash-command wrappers не требуются.
 | Skill | Назначение |
 |---|---|
 | `methodology` | Объясняет маршрутизацию, lifecycle, источники истины и модель ревью |
-| `project-initialization` | Создаёт dual-runtime проект, сохраняет существующие файлы, настраивает hooks, Git и приватный GitHub-репозиторий |
+| `project-initialization` | Создаёт dual-runtime проект с hooks и приватным GitHub-репозиторием: `main` + `dev` для ПО, только `main` для skills workspace; сохраняет существующие файлы |
 | `documentation-writing` | Создаёт, проверяет, обновляет и финализирует Project Knowledge |
 | `user-spec-planning` | Создаёт утверждённый user spec через адаптивное интервью, исследование кода и валидацию |
 
@@ -137,7 +154,7 @@ slash-command wrappers не требуются.
 
 | Skill | Назначение |
 |---|---|
-| `test-master` | Выбирает минимальную надёжную границу тестирования и проверяет качество тестов |
+| `test-master` | Выбирает минимальную надёжную границу тестирования детерминированного поведения и проверяет качество тестов |
 | `code-reviewing` | Проверяет код относительно scope, контрактов проекта и рисков качества |
 | `layout-reviewing` | Проверяет визуальную точность, адаптивность и достаточность evidence |
 | `security-auditor` | Проверяет изменённые security boundaries по применимым рискам OWASP |
@@ -176,7 +193,11 @@ Claude-определения находятся в `agents/*.md`, нативн�
 - `scripts/sync-to-codex.py` / `.sh` конвертируют Claude skills, agents, commands и проектные
   инструкции в runtime-артефакты Codex.
 - `scripts/sync-mcp-to-codex.py` / `.sh` отдельно preview/import MCP-конфигурацию.
-- `.codex/skills/` и `.codex/agents/` содержат готовый очищенный snapshot рантайма Codex.
+- `scripts/codex-sync-git-guard.py` синхронизирует проектные источники перед коммитом и проверяет
+  актуальность рантайма перед push.
+- `.agents/skills/` и `.codex/agents/` содержат готовый очищенный snapshot рантайма Codex.
+- Корневые `.githooks/` поддерживают этот публичный snapshot из `skills/` и `agents/`;
+  `.githooks/sync-runtime.py --check` проверяет его без изменений.
 - Codex-owned `.system` skills и локальное состояние `.codex/.sync/` намеренно исключены.
 
 ## Требования
@@ -191,3 +212,5 @@ Claude-определения находятся в `agents/*.md`, нативн�
 ## Лицензия и автор
 
 [MIT](LICENSE) © [Павел Молянов](https://molyanov.ru)
+
+**Telegram:** [@molyanov_blog](https://t.me/molyanov_blog)

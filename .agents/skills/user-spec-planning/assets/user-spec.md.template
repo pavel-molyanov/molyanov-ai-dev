@@ -1,0 +1,62 @@
+---
+# Creation date (YYYY-MM-DD)
+created: [DATE]
+
+# Status: draft | approved
+status: draft
+
+# Work type: feature | bug | refactoring
+type: feature
+---
+
+# User-spec: [feature/fix name]
+
+> **Executor instruction.** If the project has Project Knowledge, first read its main `SKILL.md`,
+> then only the materials it routes to for this task. Read `decisions.md` if it exists. Work from
+> the root of the project this spec belongs to. Implement the entire user-spec. Use the execution
+> skills appropriate to the work.
+
+## What We Are Building
+[2–3 sentences describing the feature or fix]
+
+## Why
+[The problem being solved and the value created]
+
+## What Changes
+[Only for changes to an existing process. Describe each affected process once: how it works now
+and how it should work after this change. Keep this at the process level; detailed target behavior
+belongs in "How It Should Work". Remove this section for a net-new feature.]
+
+## How It Should Work
+[Describe the target business behavior in plain language. Organize it by meaningful user actions
+or system events when there is more than one scenario. Include only applicable checks, branches,
+state changes, results, and important failure or stop behavior. A simple change may need only a
+short paragraph; do not force every scenario into a fixed schema.]
+
+## Scope and Constraints
+[State what is in scope, what is out of scope, and the technical or business constraints that
+materially shape the solution. Use short subsections or bullets only when they improve clarity.]
+
+## Risks
+- **Risk 1:** [what could go wrong]. **Mitigation:** [action].
+- **Risk 2:** [description]. **Mitigation:** [action].
+
+[Remove this section when there are no substantive risks to record.]
+
+## Accepted Decisions
+- Chose [X] because [Y].
+- Chose [X] instead of [Y] because [Z].
+
+[Record interview decisions in plain language. Include rejected alternatives only when they help explain a decision.]
+
+[Remove this section when no substantive decision needs to be preserved.]
+
+## Acceptance and Verification
+
+| Result | How to verify |
+|--------|---------------|
+| [Observable result that must hold] | [Concrete automated, agent, or user check at the smallest reliable boundary] |
+
+[Add or remove rows to match the meaningful results. Cover the behavior that establishes
+completion without repeating every implementation detail, including an important negative outcome
+when applicable. Include user verification only when the agent cannot perform the check itself.]

@@ -1,9 +1,11 @@
 ---
 name: prompt-master
 description: |
-  Creates, improves, and reviews LLM prompts using concise, task-aware guidance.
-
-  Use when: "напиши промпт", "улучши промпт", "prompt engineering", "проверь промпт"
+  Prompt-writing guidance: task contracts, examples, structure, chaining, structured output,
+  agent autonomy, tool descriptions, prompt-injection boundaries, and evaluation, with a
+  prompt-reviewer stage. Use whenever an LLM prompt, system prompt, subagent instruction, or tool
+  description is written, improved, or reviewed, including prompts embedded in application or bot
+  code. Skill files use skill-master.
 ---
 
 # Prompt Master
@@ -65,18 +67,13 @@ what a correct result means and use representative normal, edge, and adversarial
 match the real task. Compare old and new versions on the same scenarios. Treat a metaprompt or
 model self-critique as a source of hypotheses, not as proof that a revision is better.
 
-Run no more than two review waves. After creating or changing a prompt, run wave 1 with a fresh
-`prompt-reviewer`. Supply the prompt location, required result and output contract, input sources,
-trust boundaries, model capabilities, and callers. Review findings are diagnoses, not a work queue.
-Check the evidence and exact correction; apply only an authorized local correction to agreed normal
-behavior. If the scenario is rare or unagreed, or the correction adds behavior, state, entities,
-contracts, dependencies, architecture, or material complexity, reject it with a short reason or ask
-the user before editing. `user_decision_required: false` does not replace this check. Include
-reviewers required by other active skills in these same waves instead of starting a separate wave
-sequence.
+After creating or changing a prompt, run one review stage with a fresh `prompt-reviewer`. Supply the
+prompt location, required result and output contract, input sources, trust boundaries, model
+capabilities, callers, validation evidence, and a short explanation of what changed, how the prompt
+works, why this approach was chosen, deliberate limits, and assumptions. The reviewer verifies that
+explanation and may challenge the chosen approach or propose a more useful alternative within
+prompt quality and safety. Include reviewers required by other active skills in the same stage.
 
-If an authorized fix changes the prompt, run wave 2 with a fresh reviewer against the revised
-version. Stop after a clean wave or when no authorized correction changes the prompt. After wave 2,
-do not launch another reviewer automatically; make only remaining local corrections within the
-agreed prompt, perform applicable direct evaluation, and report any remaining findings or required
-user decisions.
+After the review, apply no finding and do not repeat it automatically. Explain what you changed and
+how the prompt works, then what the reviewer found, what it can cause, whether you agree and why,
+and what you recommend. Wait for the user's approval before editing.

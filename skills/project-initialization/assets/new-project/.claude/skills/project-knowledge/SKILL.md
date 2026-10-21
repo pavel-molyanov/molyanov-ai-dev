@@ -1,10 +1,9 @@
 ---
 name: project-knowledge
 description: |
-  Use when you need information about this project's architecture, tech stack,
-  coding patterns, data model, deployment setup, git workflow, or UX guidelines.
-  Contains comprehensive project documentation including design decisions,
-  technical specifications, and development standards.
+  How this project is built: architecture, conventions, configuration, skills and pipelines,
+  deployment, and operations. Use whenever the project itself is changed, extended, debugged,
+  deployed, or explained, including small fixes and questions about how something in it works.
 ---
 
 # Project Knowledge

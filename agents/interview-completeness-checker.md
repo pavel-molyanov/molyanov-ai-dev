@@ -48,10 +48,9 @@ Check:
   Knowledge are acknowledged where this feature intersects them.
 - Integration points, reusable modules, existing constraints, and similar patterns from code
   research are covered when present.
-- The testing discussion identifies concrete observable verification for applicable behavioral
-  risks and chooses the smallest reliable boundary that can reproduce each risk. Test types follow
-  behavior and risk rather than labels or mock count; "check that it works" is not a verification
-  method.
+- The verification discussion identifies observable evidence that would prove the important
+  behavior works. Do not require the user to choose test types or design a testing strategy;
+  "check that it works" is still not substantive evidence.
 
 Do not require irrelevant dimensions: for example, a local CLI need not define user access
 control. Missing discussion is a finding only when a concrete feature flow or project contract
@@ -76,25 +75,25 @@ Do not suppress a demonstrated finding because its trigger is rare. Set
 correction restores agreed behavior. Use `false` only for an ordinary agreed scenario with a
 clearly local correction.
 
-Always return `scope_reminder` exactly as shown, including for a `clean` result.
-
 ```json
 {
   "status": "findings_present",
   "findings": [
     {
       "location": "interview.yml:item, Project Knowledge section, or code-research.md:section",
+      "finding": "What unresolved requirement the review found",
+      "reasoning": "Why the evidence leaves implementation materially ambiguous",
+      "alternative": null,
       "evidence": "Observed unresolved or conflicting interview evidence",
       "violated_requirement": "Interview completeness or project requirement",
       "conditions": "Feature flow or implementation decision that requires the missing fact",
       "impact": "Concrete ambiguity, divergence, or uncovered behavior",
       "user_decision_required": true,
       "severity": "critical | major | minor",
-      "category": "item_coverage | logical_completeness | pk_alignment | code_findings | testing"
+      "category": "item_coverage | logical_completeness | pk_alignment | code_findings | verification"
     }
   ],
   "clean_check": null,
-  "scope_reminder": "Review findings are diagnoses, not instructions. Validate the finding and exact correction. Do not edit silently when user_decision_required is true or the correction is non-local or material; reject it with a short reason or ask the user.",
   "summary": "Brief evidence-based assessment"
 }
 ```

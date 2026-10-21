@@ -2,10 +2,9 @@
 name: project-initialization
 description: |
   Initializes a project from the standard dual-runtime template, preserves existing files,
-  configures Git hooks, and creates or connects a private GitHub repository with main and dev
-  branches.
-
-  Use when: "инициализируй проект", "создай новый проект", "init project", "initialize project"
+  configures Git hooks, and creates or connects a private GitHub repository: main and dev for
+  software projects, main only for skills workspaces. Use whenever a new project is started or
+  an existing folder needs the dual-runtime scaffold and Git setup.
 ---
 
 # Project Initialization
@@ -15,11 +14,10 @@ an `old*` directory for later review; do not merge them into the new scaffold du
 
 ## Dual-Runtime Project Generation
 
-The bundled template contains Claude project sources under `.claude/**`. Its pre-commit hook runs
-the installed `~/.claude/scripts/sync-to-codex.sh` converter after those sources are staged. This
-generates and stages the matching `AGENTS.md` and `.codex/**` runtime before the commit while
-`.gitignore` excludes host-local `.codex/.sync/**`. A reported conflict or validation error stops
-the commit.
+The bundled template contains Claude project sources under `.claude/**`. Its Git hooks use the
+installed `~/.claude/scripts/codex-sync-git-guard.py`: pre-commit generates and stages `AGENTS.md`,
+`.agents/skills/**`, and `.codex/agents/**` after the sources are staged; pre-push checks for drift.
+Host-local `.codex/.sync/**` is ignored. A reported conflict or validation error stops the action.
 
 ## 1. Check the Current Directory
 
@@ -29,6 +27,9 @@ until the user chooses.
 
 Resolve the directory of this loaded `project-initialization` skill and set `INIT_SKILL_DIR` to that
 absolute path. Verify that its `assets/new-project/` directory exists before moving project files.
+
+Determine whether this is a software project (`main` + `dev`) or a skills workspace (`main` only).
+Use the request and existing project context; ask if the type is unclear.
 
 ## 2. Preserve Existing Files and Apply the Template
 
@@ -48,21 +49,28 @@ fi
 cp -rp "$INIT_SKILL_DIR/assets/new-project/." .
 ```
 
-If `OLD_DIR` is non-empty, inspect it for `.env*`, `*.key`, `*.pem`, `credentials.json`, and
-`secrets/`. Ensure every sensitive path is covered by the new `.gitignore` before staging files.
-Never print secret contents.
+If `OLD_DIR` is non-empty, add its exact root-relative directory (for example `/old2/`) to the
+new root `.gitignore`. Keep the archive local and untracked so Git hooks do not treat its saved
+Claude configuration as another active project. Do not stage the archive.
+
+Before staging, set **Default branch** in the copied `CLAUDE.md` to `dev` for software or `main`
+for a skills workspace. For a skills workspace, also replace **Branch Structure** in
+`.claude/skills/project-knowledge/references/patterns.md` with a single `main` branch for active
+work and remove the merge-to-`dev` and merge-to-`main` testing requirements.
 
 ## 3. Initialize Git and Hooks
 
 Initialize Git with `main` as the primary branch when needed. For an existing repository, preserve
 its history and make the current primary branch `main`. Then:
 
-1. Make `.githooks/pre-commit` executable.
+1. Make `.githooks/pre-commit` and `.githooks/pre-push` executable.
 2. Set `git config core.hooksPath .githooks`.
-3. Stage the scaffold and preserved `old*` directory, subject to the secret check above.
+3. Stage the scaffold and tracked deletions caused by the move. Keep the ignored `old*` archive
+   untracked.
 4. Create the first initialization commit. The pre-commit hook generates and stages `AGENTS.md`
-   and `.codex/**` while `.gitignore` excludes `.codex/.sync/**`. If generation reports a conflict
-   or validation error, the commit stops. If the repository already has history, create a normal
+   alongside `.agents/skills/**` and `.codex/agents/**`; `.gitignore` excludes `.codex/.sync/**`.
+   If generation reports a conflict or validation error, the commit stops. If the repository already
+   has history, create a normal
    initialization commit instead of rewriting existing commits.
 
 ## 4. Connect GitHub and Create Branches
@@ -76,21 +84,23 @@ GitHub is required for this workflow. Verify that `gh` is installed and authenti
   supplied name authorizes creating the private repository. Create it with
   `gh repo create {name} --private --source=. --remote=origin`.
 
-Before any push, inspect whether a local or remote `dev` branch already exists. If neither exists,
-create `dev` from `main`. If either exists, show its relationship to `main` and ask whether to reuse
-it; never reset or recreate an existing `dev`, and stop if local and remote histories conflict.
+For software projects, before any push inspect whether a local or remote `dev` branch already
+exists. If neither exists, create `dev` from `main`. If either exists, show its relationship to
+`main` and ask whether to reuse it; never reset or recreate an existing `dev`, and stop if local
+and remote histories conflict. For a skills workspace, use `main` without creating `dev`.
 
-Ask explicitly before pushing `main`. After approval, push `main`, push the created or approved
-`dev`, leave `dev` checked out, and read the canonical repository URL through `gh`.
+Ask explicitly before pushing `main`. After approval, push `main`; for software also push the
+created or approved `dev` and leave `dev` checked out. For a skills workspace, leave `main` checked
+out. Read the canonical repository URL through `gh`.
 
 ## 5. Report the Result
 
 Report:
 
 - the GitHub URL;
-- the created or reused `main` and `dev` branches;
-- the preserved `old*` directory, or that the directory was initially empty;
-- that `dev` is the active branch;
+- the created or reused branches: `main` and `dev` for software, `main` for a skills workspace;
+- the preserved local, Git-ignored `old*` directory, or that the directory was initially empty;
+- the active branch: `dev` for software or `main` for a skills workspace;
 - the next step: create the initial Project Knowledge with `documentation-writing`.
 
 Do not review or merge files from `old*` during initialization.
